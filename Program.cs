@@ -1,5 +1,10 @@
 ﻿using System;
 using CommandLine;
+using System.Net.Sockets;
+using System.Net.NetworkInformation;
+using System.Net;
+using System.Diagnostics;
+
 
 namespace proj1
 {
@@ -7,6 +12,7 @@ namespace proj1
     {
         static void Main(string[] args)
         {
+            ScanParams scanParams = null;
             Parser.Default.ParseArguments<ArgsOptions>(args)
             .WithParsed(options =>
             {
@@ -24,7 +30,7 @@ namespace proj1
                 Console.WriteLine($"Target: {options.Target ?? "None"}");
                 
                 // create OOP representation of the command line arguments
-                ScanParams scanParams = new ScanParams
+                scanParams = new ScanParams
                 (
                     networkInterface: options.Interface,
 
@@ -49,6 +55,9 @@ namespace proj1
                     Console.WriteLine(error.ToString());
                 }
             });
+
+            Console.WriteLine(NetworkManager.IsPrivateIp(scanParams.Target));
+            
         }
     }
 }
