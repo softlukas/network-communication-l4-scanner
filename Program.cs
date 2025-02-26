@@ -57,7 +57,8 @@ namespace proj1
             });
 
             Console.WriteLine(NetworkManager.IsPrivateIp(scanParams.Target));
-            
+            Console.WriteLine(NetworkManager.GetSourceIPAddress("enp0s3"));
+            Console.WriteLine(BitConverter.ToString(NetworkManager.GetSourceMacAddress("enp0s3")));
             //enp0s3
             
             //NetworkManager.SendArpRequest("192.168.43.204");

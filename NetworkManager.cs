@@ -58,6 +58,38 @@ namespace proj1
             throw new Exception($"MAC address for interface {interface_name} was not found.");
         }
 
+        public static string GetSourceIPAddress(string interface_name)
+        {
+            
+            // find the network interface with the given name
+            foreach (var netInterface in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (netInterface.Name == interface_name || netInterface.Description.Contains(interface_name))
+                {
+                    // Iterate over all unicast addresses (addresses assigned to the interface)
+                    foreach (var unicastAddress in netInterface.GetIPProperties().UnicastAddresses)
+                    {
+                        // Filter for IPv4 addresses only
+                        if (unicastAddress.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
+                        {
+                            // Ignore loopback addresses (
+                            if (!IPAddress.IsLoopback(unicastAddress.Address))
+                            {
+                                return unicastAddress.Address.ToString(); // Return the first valid IPv4 address found
+                            }
+                        }
+                    }
+                }
+            }
+        
+            
+            // If no valid IP address is found, throw an exception
+            throw new Exception("IP address not found.");
+        }
+
+
+        
+
 
         
         
