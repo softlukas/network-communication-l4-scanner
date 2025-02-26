@@ -1,6 +1,13 @@
 using System;
+using System.Linq;
 using System.Net;
+using System.Net.NetworkInformation;
 using System.Net.Sockets;
+using PacketDotNet;
+using SharpPcap;
+using SharpPcap.LibPcap;
+
+
 
 namespace proj1
 {
@@ -36,6 +43,24 @@ namespace proj1
                 throw new ArgumentException("Invalid IP address format.");
             }
         }
+
+        public static byte[] GetSourceMacAddress(string interface_name)
+        {
+            // find the network interface with the given name
+            foreach (var netInterface in NetworkInterface.GetAllNetworkInterfaces())
+            {
+                if (netInterface.Name == interface_name || netInterface.Description.Contains(interface_name))
+                {
+                    return netInterface.GetPhysicalAddress().GetAddressBytes();
+                }
+            }
+
+            throw new Exception($"MAC address for interface {interface_name} was not found.");
+        }
+
+
+        
+        
     
     }
 }

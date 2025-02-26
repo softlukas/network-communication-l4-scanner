@@ -58,6 +58,10 @@ namespace proj1
 
             Console.WriteLine(NetworkManager.IsPrivateIp(scanParams.Target));
             
+            //enp0s3
+            
+            //NetworkManager.SendArpRequest("192.168.43.204");
+            
         }
     }
 }
