@@ -17,6 +17,6 @@ namespace proj1
         public int? Timeout { get; set; }
 
         [Value(0, MetaName = "target", Required = false, HelpText = "Target domain name or IP address to scan.")]
-        public string? Target { get; set; }
+        public string? TargetIp { get; set; }
     }
 }

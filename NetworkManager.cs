@@ -13,8 +13,28 @@ namespace proj1
 {
     static class NetworkManager
     {
+
+        public static byte[] GetTargetMac(string targetIp, string networkInterface) 
+        {
+            
+            // get source IP and MAC
+            byte[] sourceIp = GetSourceIPAddress(networkInterface);
+            byte[] sourceMac = GetSourceMacAddress(networkInterface);
+
+            IPAddress ipAddress = IPAddress.Parse(targetIp);
+            byte[] targetIpBytes = ipAddress.GetAddressBytes();
+
+            if(!IsPrivateIp(targetIp))
+            {
+                targetIpBytes = GetGatewayIP(networkInterface);
+            }
+
+            Packet ethernetPacket = BuildArpRequest(sourceMac, sourceIp, targetIpBytes);
+            // send ARP request packet -> get dest MAC
+            return SendArpRequest(ethernetPacket, networkInterface, targetIpBytes);
+        }
         
-        public static bool IsPrivateIp(string ipAddress)
+        private static bool IsPrivateIp(string ipAddress)
         {
             // get object of IP addr
             IPAddress ip;
@@ -95,7 +115,7 @@ namespace proj1
             throw new Exception("IP address not found.");
         }
 
-        public static byte[] GetGatewayIP(string interfaceName) {
+        private static byte[] GetGatewayIP(string interfaceName) {
             
             // Find the specified network interface by name
             var networkInterface = NetworkInterface
@@ -104,7 +124,7 @@ namespace proj1
 
             if (networkInterface == null)
             {
-                Console.WriteLine($"Interface {interfaceName} not found.");
+                Console.WriteLine($"Interface {networkInterface} not found.");
                 return null;
             }
 
@@ -122,7 +142,7 @@ namespace proj1
         // Constructs an ARP request packet to discover the MAC address of a target IP.
         // The request is encapsulated in an Ethernet frame and broadcasted on the network.
 
-        public static Packet BuildArpRequest(byte[] sourceMac, byte[] sourceIP, byte[] targetIP)
+        private static Packet BuildArpRequest(byte[] sourceMac, byte[] sourceIP, byte[] targetIP)
         {
             // Create an Ethernet packet with:
             // - Destination MAC: Broadcast address (FF:FF:FF:FF:FF:FF)
@@ -130,20 +150,20 @@ namespace proj1
             // - Ethernet Type: ARP (Address Resolution Protocol)
             
             // set destination MAC to broadcast
-            byte[] destMac = new byte[6];
-            destMac = new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
+            byte[] targetMac = new byte[6];
+            targetMac = new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
             
             // create Ethernet packet
             var ethernetPacket = new EthernetPacket(
                 new PhysicalAddress(sourceMac),
-                new PhysicalAddress(destMac),   //broadcast                                    
+                new PhysicalAddress(targetMac),   //broadcast                                    
                 EthernetType.Arp);
 
             // Create an ARP request packet with:
             
             var arpPacket = new ArpPacket(
                 ArpOperation.Request,             // ARP request operation
-                new PhysicalAddress(destMac),     // braodcast
+                new PhysicalAddress(targetMac),     // braodcast
                 new IPAddress(targetIP),          
                 new PhysicalAddress(sourceMac),   
                 new IPAddress(sourceIP));         
@@ -157,7 +177,7 @@ namespace proj1
         }
 
         // Sends an ARP request packet and waits for a response containing the MAC address of the target IP.
-        public static byte[] SendArpRequest(Packet arpRequestPacket, string interfaceName, byte[] targetIP)
+        private static byte[] SendArpRequest(Packet arpRequestPacket, string networkInterface, byte[] targetIP)
         {
             // get list of network devices
             var devices = CaptureDeviceList.Instance;
@@ -169,7 +189,7 @@ namespace proj1
             }
 
             // find device baased on interface name
-            var device = devices.FirstOrDefault(d => d.Name == interfaceName);
+            var device = devices.FirstOrDefault(d => d.Name == networkInterface);
 
             if (device == null)
             {
@@ -197,7 +217,6 @@ namespace proj1
                 // Read the next packet from the network device
                 if (device.GetNextPacket(out rawPacket) != GetPacketStatus.PacketRead)
                 {
-                    Console.WriteLine("citam packet");
                     continue;
                 }
                 

@@ -19,7 +19,7 @@ namespace proj1
             Parser.Default.ParseArguments<ArgsOptions>(args)
             .WithParsed(options =>
             {
-                if (string.IsNullOrEmpty(options.Interface) && string.IsNullOrEmpty(options.Target))
+                if (string.IsNullOrEmpty(options.Interface) && string.IsNullOrEmpty(options.TargetIp))
                 {
                     Console.WriteLine("Listing active interfaces...");
                     
@@ -30,8 +30,9 @@ namespace proj1
                 Console.WriteLine($"TCP Ports: {options.TcpPorts ?? "None"}");
                 Console.WriteLine($"UDP Ports: {options.UdpPorts ?? "None"}");
                 Console.WriteLine($"Timeout: {options.Timeout} ms");
-                Console.WriteLine($"Target: {options.Target ?? "None"}");
+                Console.WriteLine($"Target: {options.TargetIp ?? "None"}");
                 
+            
                 // create OOP representation of the command line arguments
                 scanParams = new ScanParams
                 (
@@ -41,7 +42,11 @@ namespace proj1
                     udpPorts: options.UdpPorts?.Split(',').ToList() ?? new List<string>(),
                     tcpPorts: options.TcpPorts?.Split(',').ToList() ?? new List<string>(),
 
-                    target: options.Target
+                    targetIp: options.TargetIp,
+
+                    sourceIp: NetworkManager.GetSourceIPAddress(options.Interface),
+                    sourceMac: NetworkManager.GetSourceMacAddress(options.Interface),
+                    targetMac: NetworkManager.GetTargetMac(options.TargetIp, options.Interface)
                 );
 
                 foreach(string item in scanParams.UdpPorts)
@@ -59,22 +64,6 @@ namespace proj1
                 }
             });
 
-            // get source IP and MAC
-            byte[] sourceIp = NetworkManager.GetSourceIPAddress("enp0s3");
-            byte[] sourceMac = NetworkManager.GetSourceMacAddress("enp0s3");
-
-            //tranfer IP from string to byte[]
-            //IPAddress ipAddress = IPAddress.Parse(ipString);
-            //byte[] destIP = ipAddress.GetAddressBytes();
-            
-            // if dest IP is outside local network, geteway IP for ARP request is used
-            byte[] destIP = NetworkManager.GetGatewayIP("enp0s3");
-
-            // create ARP request packet
-            Packet ethernetPacket = NetworkManager.BuildArpRequest(sourceMac, sourceIp, destIP);
-            // send ARP request packet -> get dest MAC
-            byte[] destMac = NetworkManager.SendArpRequest(ethernetPacket, "enp0s3", destIP);
-            
         }
     }
 }
