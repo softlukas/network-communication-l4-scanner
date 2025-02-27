@@ -64,6 +64,8 @@ namespace proj1
                 }
             });
 
+            scanParams.SendSynPacket();
+
         }
     }
 }

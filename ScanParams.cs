@@ -1,5 +1,13 @@
 using System;
-using System.Collections.Generic;
+using System.Linq;
+using System.Net;
+using System.Net.NetworkInformation;
+using System.Net.Sockets;
+using PacketDotNet;
+using SharpPcap;
+using SharpPcap.LibPcap;
+
+
 
 namespace proj1
 {
@@ -13,6 +21,11 @@ namespace proj1
         public byte[] SourceMac { get; private set; }
         public byte[] TargetMac { get; private set; }
 
+        private string stringSourceIp;
+        private string stringTargetIp;
+        private string stringSourceMac;
+        private string stringTargetMac;
+
         public ScanParams(string? networkInterface, List<string> udpPorts, List<string> tcpPorts, 
         string? targetIp, byte[] sourceIp, byte[] sourceMac, byte[] targetMac)
         {
@@ -22,10 +35,56 @@ namespace proj1
             TargetIp = targetIp;
             SourceIp = sourceIp;
             SourceMac = sourceMac;
+
+            stringSourceMac = BitConverter.ToString(SourceMac).Replace("-", ":");
+            stringTargetMac = BitConverter.ToString(TargetMac).Replace("-", ":");
         }
 
         public void SendSynPacket() {
+            // Find the specified network interface
+            var devices = CaptureDeviceList.Instance;
+            var device = devices.FirstOrDefault(d => d.Name == NetworkInterface);
+
+            if (device == null)
+            {
+                Console.WriteLine($"Interface {NetworkInterface} not found.");
+                return;
+            }
+
+            device.Open();
+
+            // Create Ethernet frame
+            var ethernetPacket = new EthernetPacket(
+                PhysicalAddress.Parse(stringSourceMac),
+                PhysicalAddress.Parse(stringTargetMac),
+                EthernetType.IPv4
+            );
+
+            // Create IP header
+            var ipPacket = new IPv4Packet(IPAddress.Parse(this.stringSourceIp), IPAddress.Parse(this.stringTargetIp))
+            {
+                Protocol = PacketDotNet.ProtocolType.Tcp,
+                TimeToLive = 128
+            };
+
+            // Create TCP SYN packet
+            var tcpPacket = new TcpPacket(12345, 80) // Source port, destination port
+            {
+                Flags = TcpFlags.SYN, 
+                WindowSize = 8192
+            };
+
+            tcpPacket.ComputeChecksum(); // Compute the checksum
+
             
+            ipPacket.PayloadPacket = tcpPacket;
+            ethernetPacket.PayloadPacket = ipPacket;
+
+            // Send the packet
+            device.SendPacket(ethernetPacket);
+
+            Console.WriteLine("SYN packet sent!");
+            device.Close();
         }
 
     
