@@ -1,9 +1,12 @@
 ﻿using System;
 using CommandLine;
+using System.Net;
 using System.Net.Sockets;
 using System.Net.NetworkInformation;
 using System.Net;
 using System.Diagnostics;
+using PacketDotNet;
+
 
 
 namespace proj1
@@ -56,12 +59,21 @@ namespace proj1
                 }
             });
 
-            Console.WriteLine(NetworkManager.IsPrivateIp(scanParams.Target));
-            Console.WriteLine(NetworkManager.GetSourceIPAddress("enp0s3"));
-            Console.WriteLine(BitConverter.ToString(NetworkManager.GetSourceMacAddress("enp0s3")));
-            //enp0s3
+            // get source IP and MAC
+            byte[] sourceIp = NetworkManager.GetSourceIPAddress("enp0s3");
+            byte[] sourceMac = NetworkManager.GetSourceMacAddress("enp0s3");
+
+            // dest IP, gatewway if outside of local network
+            string ipString = "192.168.43.1";
+
+            //tranfer IP from string to byte[]
+            IPAddress ipAddress = IPAddress.Parse(ipString);
+            byte[] destIP = ipAddress.GetAddressBytes();
             
-            //NetworkManager.SendArpRequest("192.168.43.204");
+            // create ARP request packet
+            Packet ethernetPacket = NetworkManager.BuildArpRequest(sourceMac, sourceIp, destIP);
+            // send ARP request packet -> get dest MAC
+            byte[] destMac = NetworkManager.SendArpRequest(ethernetPacket, "enp0s3", destIP);
             
         }
     }
