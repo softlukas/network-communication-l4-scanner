@@ -63,13 +63,13 @@ namespace proj1
             byte[] sourceIp = NetworkManager.GetSourceIPAddress("enp0s3");
             byte[] sourceMac = NetworkManager.GetSourceMacAddress("enp0s3");
 
-            // dest IP, gatewway if outside of local network
-            string ipString = "192.168.43.1";
-
             //tranfer IP from string to byte[]
-            IPAddress ipAddress = IPAddress.Parse(ipString);
-            byte[] destIP = ipAddress.GetAddressBytes();
+            //IPAddress ipAddress = IPAddress.Parse(ipString);
+            //byte[] destIP = ipAddress.GetAddressBytes();
             
+            // if dest IP is outside local network, geteway IP for ARP request is used
+            byte[] destIP = NetworkManager.GetGatewayIP("enp0s3");
+
             // create ARP request packet
             Packet ethernetPacket = NetworkManager.BuildArpRequest(sourceMac, sourceIp, destIP);
             // send ARP request packet -> get dest MAC

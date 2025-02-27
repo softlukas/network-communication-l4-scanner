@@ -94,6 +94,29 @@ namespace proj1
             // If no valid IP address is found, throw an exception
             throw new Exception("IP address not found.");
         }
+
+        public static byte[] GetGatewayIP(string interfaceName) {
+            
+            // Find the specified network interface by name
+            var networkInterface = NetworkInterface
+                .GetAllNetworkInterfaces()
+                .FirstOrDefault(nic => nic.Name == interfaceName);
+
+            if (networkInterface == null)
+            {
+                Console.WriteLine($"Interface {interfaceName} not found.");
+                return null;
+            }
+
+            // Get the gateway addresses for the interface
+            var gatewayAddresses = networkInterface.GetIPProperties().GatewayAddresses;
+            if (gatewayAddresses.Count == 1)
+            {
+                Console.WriteLine($"Gateway address: {gatewayAddresses[0].Address}");
+                return gatewayAddresses[0].Address.GetAddressBytes();
+            }
+            throw new Exception("Gateway address not found.");
+        }
         
 
         // Constructs an ARP request packet to discover the MAC address of a target IP.
