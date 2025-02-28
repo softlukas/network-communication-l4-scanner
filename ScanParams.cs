@@ -16,7 +16,7 @@ namespace proj1
         public string? NetworkInterface { get; private set; }
         public List<string> UdpPorts { get; private set; }
         public List<string> TcpPorts { get; private set; }
-        public string? TargetIp { get; private set; }
+        public string TargetIp { get; private set; }
         public byte[] SourceIp { get; private set; }
         public byte[] SourceMac { get; private set; }
         public byte[] TargetMac { get; private set; }
@@ -27,7 +27,7 @@ namespace proj1
         private string stringTargetMac;
 
         public ScanParams(string? networkInterface, List<string> udpPorts, List<string> tcpPorts, 
-        string? targetIp, byte[] sourceIp, byte[] sourceMac, byte[] targetMac)
+        string targetIp, byte[] sourceIp, byte[] sourceMac, byte[] targetMac)
         {
             NetworkInterface = networkInterface;
             UdpPorts = udpPorts;
@@ -40,6 +40,7 @@ namespace proj1
             stringSourceMac = BitConverter.ToString(SourceMac);
             stringTargetMac = BitConverter.ToString(TargetMac);
             stringSourceIp = new IPAddress(SourceIp).ToString();
+
         }
 
 
@@ -74,22 +75,24 @@ namespace proj1
                 PhysicalAddress.Parse(stringTargetMac),
                 EthernetType.IPv4
             );
-
             // Create IP header
-            var ipPacket = new IPv4Packet(IPAddress.Parse(this.stringSourceIp), IPAddress.Parse(this.stringTargetIp))
+            var ipPacket = new IPv4Packet(IPAddress.Parse(this.stringSourceIp), IPAddress.Parse(TargetIp))
             {
                 Protocol = PacketDotNet.ProtocolType.Tcp,
                 TimeToLive = 128
             };
 
             // Create TCP SYN packet
-            var tcpPacket = new TcpPacket(12345, 80) // Source port, destination port
+            // Create TCP SYN packet
+            TcpPacket tcpPacket = new TcpPacket(12345, 80) // Source port, destination port
             {
-                Flags = TcpFlags.SYN, 
+                Synchronize = true, // Set SYN flag
                 WindowSize = 8192
             };
+            
 
-            tcpPacket.ComputeChecksum(); // Compute the checksum
+            ipPacket.PayloadPacket = tcpPacket; 
+            tcpPacket.UpdateTcpChecksum(); 
 
             
             ipPacket.PayloadPacket = tcpPacket;
