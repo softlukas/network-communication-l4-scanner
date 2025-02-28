@@ -30,7 +30,9 @@ namespace proj1
             }
 
             Packet ethernetPacket = BuildArpRequest(sourceMac, sourceIp, targetIpBytes);
+            
             // send ARP request packet -> get dest MAC
+    
             return SendArpRequest(ethernetPacket, networkInterface, targetIpBytes);
         }
         

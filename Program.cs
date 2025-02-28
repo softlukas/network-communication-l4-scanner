@@ -64,6 +64,8 @@ namespace proj1
                 }
             });
 
+            Console.WriteLine(scanParams.ToString());
+
             scanParams.SendSynPacket();
 
         }

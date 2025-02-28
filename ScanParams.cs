@@ -35,11 +35,26 @@ namespace proj1
             TargetIp = targetIp;
             SourceIp = sourceIp;
             SourceMac = sourceMac;
+            TargetMac = targetMac;
 
-            stringSourceMac = BitConverter.ToString(SourceMac).Replace("-", ":");
-            stringTargetMac = BitConverter.ToString(TargetMac).Replace("-", ":");
+            stringSourceMac = BitConverter.ToString(SourceMac);
+            stringTargetMac = BitConverter.ToString(TargetMac);
+            stringSourceIp = new IPAddress(SourceIp).ToString();
         }
 
+
+        public override string ToString()
+        {
+            return $"Interface: {NetworkInterface ?? "None"}\n" +
+                   $"UDP Ports: {string.Join(",", UdpPorts)}\n" +
+                   $"TCP Ports: {string.Join(",", TcpPorts)}\n" +
+                   $"Target IP: {TargetIp ?? "None"}\n" +
+                   $"Source IP: {stringSourceIp}\n" +
+                   $"Source MAC: {stringSourceMac}\n" +
+                   $"Target MAC: {stringTargetMac}";
+        }
+
+        
         public void SendSynPacket() {
             // Find the specified network interface
             var devices = CaptureDeviceList.Instance;
@@ -86,7 +101,7 @@ namespace proj1
             Console.WriteLine("SYN packet sent!");
             device.Close();
         }
-
+        
     
     }
 }
