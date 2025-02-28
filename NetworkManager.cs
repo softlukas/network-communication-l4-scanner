@@ -60,7 +60,9 @@ namespace proj1
             }
             else
             {
-                throw new ArgumentException("Invalid IP address format.");
+                Console.WriteLine("Error: Invalid IP address format.");
+                Environment.Exit(1);
+                return false;
             }
         }
 
@@ -79,8 +81,9 @@ namespace proj1
                     
                 }
             }
-
-            throw new Exception($"MAC address for interface {interface_name} was not found.");
+            Console.WriteLine($" Error: MAC address for interface {interface_name} was not found.");
+            Environment.Exit(1);
+            return null;
         }
 
         public static byte[] GetSourceIPAddress(string interface_name)
@@ -112,7 +115,9 @@ namespace proj1
         
             
             // If no valid IP address is found, throw an exception
-            throw new Exception("IP address not found.");
+            Console.WriteLine($"Error: IP address for interface {interface_name} was not found.");
+            Environment.Exit(1);
+            return null;
         }
 
         private static byte[] GetGatewayIP(string interfaceName) {
@@ -135,7 +140,9 @@ namespace proj1
                 Console.WriteLine($"Gateway address: {gatewayAddresses[0].Address}");
                 return gatewayAddresses[0].Address.GetAddressBytes();
             }
-            throw new Exception("Gateway address not found.");
+            Console.WriteLine("Error: Gateway address not found.");
+            Environment.Exit(1);
+            return null;
         }
         
 
@@ -184,7 +191,8 @@ namespace proj1
 
             if (devices == null || devices.Count == 0)
             {
-                Console.WriteLine("No devices found.");
+                Console.WriteLine("Error: No devices found.");
+                Environment.Exit(1);
                 return null;
             }
 
@@ -193,7 +201,8 @@ namespace proj1
 
             if (device == null)
             {
-                Console.WriteLine("No suitable device found.");
+                Console.WriteLine("Error: No suitable device found.");
+                Environment.Exit(1);
                 return null;
             }
 
@@ -248,8 +257,9 @@ namespace proj1
             }
 
             device.Close();
-            throw new TimeoutException("ARP Reply not received within timeout.");
-            
+            Console.WriteLine("Error: ARP Reply not received within timeout.");
+            Environment.Exit(1);
+            return null;
             
         }
 
