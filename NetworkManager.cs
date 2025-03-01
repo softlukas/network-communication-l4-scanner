@@ -1,12 +1,9 @@
 using System;
-using System.Linq;
-using System.Net;
 using System.Net.NetworkInformation;
+using System.Net;
 using System.Net.Sockets;
-using PacketDotNet;
 using SharpPcap;
 using SharpPcap.LibPcap;
-
 
 
 namespace proj1
@@ -29,7 +26,7 @@ namespace proj1
                 targetIpBytes = GetGatewayIP(networkInterface);
             }
 
-            Packet ethernetPacket = BuildArpRequest(sourceMac, sourceIp, targetIpBytes);
+            byte[] ethernetPacket = BuildArpRequest(sourceMac, sourceIp, targetIpBytes);
             
             // send ARP request packet -> get dest MAC
     
@@ -151,42 +148,38 @@ namespace proj1
         // Constructs an ARP request packet to discover the MAC address of a target IP.
         // The request is encapsulated in an Ethernet frame and broadcasted on the network.
 
-        private static Packet BuildArpRequest(byte[] sourceMac, byte[] sourceIP, byte[] targetIP)
+        private static byte[] BuildArpRequest(byte[] sourceMac, byte[] sourceIP, byte[] targetIP)
         {
-            // Create an Ethernet packet with:
-            // - Destination MAC: Broadcast address (FF:FF:FF:FF:FF:FF)
-            // - Source MAC: Provided source MAC address
-            // - Ethernet Type: ARP (Address Resolution Protocol)
-            
-            // set destination MAC to broadcast
-            byte[] targetMac = new byte[6];
-            targetMac = new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
-            
-            // create Ethernet packet
-            var ethernetPacket = new EthernetPacket(
-                new PhysicalAddress(sourceMac),
-                new PhysicalAddress(targetMac),   //broadcast                                    
-                EthernetType.Arp);
+            // broadcast MAC address
+            byte[] targetMac = new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 
-            // Create an ARP request packet with:
-            
-            var arpPacket = new ArpPacket(
-                ArpOperation.Request,             // ARP request operation
-                new PhysicalAddress(targetMac),     // braodcast
-                new IPAddress(targetIP),          
-                new PhysicalAddress(sourceMac),   
-                new IPAddress(sourceIP));         
+            byte[] arpPacket = new byte[42];
 
-            // Attach the ARP packet as the payload of the Ethernet frame.
-            ethernetPacket.PayloadPacket = arpPacket;
+            // Ethernet header
+            Array.Copy(targetMac, 0, arpPacket, 0, 6); // Destination MAC
+            Array.Copy(sourceMac, 0, arpPacket, 6, 6); // Source MAC
+            arpPacket[12] = 0x08; // Ethernet type (ARP)
+            arpPacket[13] = 0x06;
 
-            // Return the complete Ethernet frame containing the ARP request.
-            byte[] rawBytes = ethernetPacket.Bytes;
-            return ethernetPacket;
+            // ARP header
+            arpPacket[14] = 0x00; // Hardware type (Ethernet)
+            arpPacket[15] = 0x01;
+            arpPacket[16] = 0x08; // Protocol type (IPv4)
+            arpPacket[17] = 0x00;
+            arpPacket[18] = 0x06; // Hardware size
+            arpPacket[19] = 0x04; // Protocol size
+            arpPacket[20] = 0x00; // Opcode (request)
+            arpPacket[21] = 0x01;
+            Array.Copy(sourceMac, 0, arpPacket, 22, 6); // Sender MAC address
+            Array.Copy(sourceIP, 0, arpPacket, 28, 4); // Sender IP address
+            Array.Copy(targetMac, 0, arpPacket, 32, 6); // Target MAC address
+            Array.Copy(targetIP, 0, arpPacket, 38, 4); // Target IP address
+
+            return arpPacket;
         }
 
         // Sends an ARP request packet and waits for a response containing the MAC address of the target IP.
-        private static byte[] SendArpRequest(Packet arpRequestPacket, string networkInterface, byte[] targetIP)
+        private static byte[] SendArpRequest(byte[] arpRequestPacket, string networkInterface, byte[] targetIP)
         {
             // get list of network devices
             var devices = CaptureDeviceList.Instance;
@@ -198,7 +191,7 @@ namespace proj1
                 return null;
             }
 
-            // find device baased on interface name
+            // find device based on interface name
             var device = devices.FirstOrDefault(d => d.Name == networkInterface);
 
             if (device == null)
@@ -208,14 +201,12 @@ namespace proj1
                 return null;
             }
 
-            
             device.Open();
 
             // send ARP request
             Console.WriteLine("Sending ARP request...");
             device.SendPacket(arpRequestPacket);
 
-            
             Console.WriteLine("Listening for ARP replies...");
 
             // set timeout
@@ -230,31 +221,24 @@ namespace proj1
                 {
                     continue;
                 }
-                
-                var linkLayerType = device.LinkType;
 
-                
-                Packet packet = Packet.ParsePacket(linkLayerType, rawPacket.Data.ToArray());
-                
-                var ethPacket = packet.Extract<EthernetPacket>();
+                byte[] packetData = rawPacket.Data.ToArray();
 
-                if (ethPacket == null || ethPacket.Type != EthernetType.Arp)
+                // Check if the packet is an ARP reply
+                if (packetData.Length >= 42 && packetData[12] == 0x08 && packetData[13] == 0x06 && packetData[20] == 0x00 && packetData[21] == 0x02)
                 {
-                    continue;
-                }
-                
-                var arpPacket = packet.Extract<ArpPacket>();
-                if (arpPacket == null || arpPacket.Operation != ArpOperation.Response)
-                {
-                    continue;
-                }
-                
-                // Check if the ARP reply is from the target IP
-                if (arpPacket.SenderProtocolAddress.Equals(new IPAddress(targetIP)))
-                {
-                    Console.WriteLine($"ARP Reply from {arpPacket.SenderProtocolAddress}: {arpPacket.SenderHardwareAddress}");
-                    device.Close();
-                    return arpPacket.SenderHardwareAddress.GetAddressBytes();
+                    byte[] senderIp = new byte[4];
+                    Array.Copy(packetData, 28, senderIp, 0, 4);
+
+                    // Check if the ARP reply is from the target IP
+                    if (senderIp.SequenceEqual(targetIP))
+                    {
+                        byte[] senderMac = new byte[6];
+                        Array.Copy(packetData, 22, senderMac, 0, 6);
+                        Console.WriteLine($"ARP Reply from {new IPAddress(senderIp)}: {BitConverter.ToString(senderMac)}");
+                        device.Close();
+                        return senderMac;
+                    }
                 }
             }
 
