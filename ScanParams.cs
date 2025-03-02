@@ -51,7 +51,9 @@ namespace proj1
                    $"Target IP: {TargetIp ?? "None"}\n" +
                    $"Source IP: {stringSourceIp}\n" +
                    $"Source MAC: {stringSourceMac}\n" +
-                   $"Target MAC: {stringTargetMac}";
+                   $"Target MAC: {stringTargetMac}\n\n" +
+                    $"Interesting ports on {TargetIp}:\n";
+
         }
         
         public void ScanTcpPorts() {
@@ -70,7 +72,6 @@ namespace proj1
 
             foreach (string port in TcpPorts)
             {
-                Console.WriteLine($"Scanning TCP port {port}...");
                 try
                 {
                     SendSynPacket(deviceInterface, ushort.Parse(port));
@@ -111,7 +112,7 @@ namespace proj1
         }
 
         
-        private void SendSynPacket(ILiveDevice deviceInterface, ushort destinationPort) {
+        private void SendSynPacket(ILiveDevice deviceInterface, ushort destinationPort, bool resending = false) {
             
             // set destination port
             byte[] destPortBytes = BitConverter.GetBytes((ushort)destinationPort);
@@ -201,7 +202,7 @@ namespace proj1
 
             // Combine Ethernet, IP, and TCP headers into a single packet
             byte[] packet = new byte[ethernetFrame.Length + ipHeader.Length + tcpHeader.Length];
-            Console.WriteLine("Packet length: " + packet.Length);
+            
             Array.Copy(ethernetFrame, 0, packet, 0, ethernetFrame.Length);
             Array.Copy(ipHeader, 0, packet, ethernetFrame.Length, ipHeader.Length);
             Array.Copy(tcpHeader, 0, packet, ethernetFrame.Length + ipHeader.Length, tcpHeader.Length);
@@ -209,11 +210,9 @@ namespace proj1
             // Send the packet
             deviceInterface.SendPacket(packet);
 
-            Console.WriteLine("SYN packet sent!");
-        
             // set timeout
             DateTime startTime = DateTime.Now;
-            TimeSpan timeout = TimeSpan.FromSeconds(5);
+            TimeSpan timeout = TimeSpan.FromSeconds(2);
 
             while (DateTime.Now - startTime < timeout)
             {
@@ -250,22 +249,33 @@ namespace proj1
                             // Check if the packet is a SYN-ACK packet
                             if ((tcpHeaderReceived[13] & 0x12) == 0x12) // SYN and ACK flags set
                             {
-                                Console.WriteLine($"SYN-ACK received from {new IPAddress(sourceIp)}");
-                                Console.WriteLine("Port is open.");
-                                break;
+                                Console.WriteLine("{0}/tcp open", destinationPort);
+                                return;
                             }
 
                             // Check if the packet is a RST packet
-                            if ((tcpHeaderReceived[13] & 0x04) == 0x04) // RST flag set
+                            if ((tcpHeaderReceived[13] & 0x04) == 0x04 && resending == false) // RST flag set
                             {
-                                Console.WriteLine($"RST received from {new IPAddress(sourceIp)}");
-                                Console.WriteLine("Port is closed.");
+                                Console.WriteLine("{0}/tcp closed", destinationPort);
+                                return;
                             }
 
                         }
                     }
                 }
             }
+            // if no response between timeout, send SYN packet again
+            if(resending == false)
+            {
+                SendSynPacket(deviceInterface, destinationPort, true);
+            }
+            // mark port as filtered after resending
+            if(resending == true)
+            {
+                Console.WriteLine("{0}/tcp filtered", destinationPort);
+            }
+            
+
 
         }
         
