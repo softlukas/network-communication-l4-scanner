@@ -54,6 +54,30 @@ namespace proj1
                    $"Target MAC: {stringTargetMac}";
         }
         
+        public void ScanTcpPorts() {
+
+            // Find the specified network interface
+            var devices = CaptureDeviceList.Instance;
+            ILiveDevice deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
+
+            if (deviceInterface == null)
+            {
+                Console.WriteLine($"Interface {NetworkInterface} not found.");
+                return;
+            }
+
+            deviceInterface.Open();
+
+            foreach (string port in TcpPorts)
+            {
+                Console.WriteLine($"Scanning TCP port {port}...");
+                SendSynPacket(deviceInterface);
+            }
+
+            deviceInterface.Close();
+
+        }
+
         public void UdpScan() {
             foreach (string port in UdpPorts)
             {
@@ -80,20 +104,7 @@ namespace proj1
         }
 
         
-        public void SendSynPacket() {
-           
-            // Find the specified network interface
-            var devices = CaptureDeviceList.Instance;
-            var device = devices.FirstOrDefault(d => d.Name == NetworkInterface);
-
-            if (device == null)
-            {
-                Console.WriteLine($"Interface {NetworkInterface} not found.");
-                return;
-            }
-
-            device.Open();
-            
+        private void SendSynPacket(ILiveDevice deviceInterface) {
             
             // Create Ethernet frame
             byte[] ethernetFrame = new byte[14];
@@ -177,7 +188,7 @@ namespace proj1
             Array.Copy(tcpHeader, 0, packet, ethernetFrame.Length + ipHeader.Length, tcpHeader.Length);
 
             // Send the packet
-            device.SendPacket(packet);
+            deviceInterface.SendPacket(packet);
 
             Console.WriteLine("SYN packet sent!");
         
@@ -188,8 +199,8 @@ namespace proj1
             while (DateTime.Now - startTime < timeout)
             {
                 PacketCapture rawPacket;
-                // Read the next packet from the network device
-                if (device.GetNextPacket(out rawPacket) != GetPacketStatus.PacketRead)
+                // Read the next packet from the network deviceInterface
+                if (deviceInterface.GetNextPacket(out rawPacket) != GetPacketStatus.PacketRead)
                 {
                     continue;
                 }
@@ -237,9 +248,6 @@ namespace proj1
                 }
             }
 
-            device.Close();
-
-            
         }
         
         private static ushort CalculateChecksum(byte[] data)
