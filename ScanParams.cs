@@ -71,7 +71,14 @@ namespace proj1
             foreach (string port in TcpPorts)
             {
                 Console.WriteLine($"Scanning TCP port {port}...");
-                SendSynPacket(deviceInterface);
+                try
+                {
+                    SendSynPacket(deviceInterface, ushort.Parse(port));
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Invalid port number format: {port}");
+                }
             }
 
             deviceInterface.Close();
@@ -104,8 +111,18 @@ namespace proj1
         }
 
         
-        private void SendSynPacket(ILiveDevice deviceInterface) {
+        private void SendSynPacket(ILiveDevice deviceInterface, ushort destinationPort) {
             
+            // set destination port
+            byte[] destPortBytes = BitConverter.GetBytes((ushort)destinationPort);
+
+            // Ensure the byte array is in network byte order (big-endian)
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(destPortBytes); // Ensure the byte array is in network byte order (big-endian)
+            }
+
+
             // Create Ethernet frame
             byte[] ethernetFrame = new byte[14];
             Array.Copy(TargetMac, 0, ethernetFrame, 0, 6); // Destination MAC
@@ -143,8 +160,10 @@ namespace proj1
             byte[] tcpHeader = new byte[20];
             tcpHeader[0] = 0x30; // Source port (12345)
             tcpHeader[1] = 0x39; // Source port (12345)
-            tcpHeader[2] = 0x00; // High byte of destination port (80)
-            tcpHeader[3] = 0x50; // Low byte of destination port (80)
+            tcpHeader[2] = destPortBytes[0]; // High byte of destination port
+            tcpHeader[3] = destPortBytes[1]; // Low byte of destination port
+
+
             tcpHeader[4] = 0x00; // Sequence number
             tcpHeader[5] = 0x00; // Sequence number
             tcpHeader[6] = 0x00; // Sequence number
