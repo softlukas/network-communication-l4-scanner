@@ -20,6 +20,7 @@ namespace proj1
         public byte[] SourceMac { get; private set; }
         public byte[] TargetMac { get; private set; }
 
+
         private string stringSourceIp;
         private string stringTargetIp;
         private string stringSourceMac;
