@@ -26,7 +26,7 @@ namespace proj1
                 Console.WriteLine($"Timeout: {options.Timeout} ms");
                 Console.WriteLine($"Target: {options.TargetIp ?? "None"}");
                 
-            
+
                 // create OOP representation of the command line arguments
                 scanParams = new ScanParams
                 (
@@ -39,9 +39,10 @@ namespace proj1
                     targetIp: options.TargetIp,
 
                     sourceIp: NetworkManager.GetSourceIPAddress(options.Interface),
-                    sourceMac: NetworkManager.GetSourceMacAddress(options.Interface),
-                    targetMac: NetworkManager.GetTargetMac(options.TargetIp, options.Interface)
+                    sourceMac: NetworkManager.GetSourceMacAddress(options.Interface)
                 );
+
+                
 
                 foreach(string item in scanParams.UdpPorts)
                 {

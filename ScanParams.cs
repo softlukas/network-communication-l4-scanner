@@ -15,11 +15,29 @@ namespace proj1
         public string? NetworkInterface { get; private set; }
         public List<string> UdpPorts { get; private set; }
         public List<string> TcpPorts { get; private set; }
-        public string TargetIp { get; private set; }
+
+        private string _targetIp;
+
+        // if target ip is domain name, use DNS
+        public string TargetIp
+        {
+            get => _targetIp;
+            private set
+            {
+                if (IPAddress.TryParse(value, out IPAddress ipAddress))
+                {
+                    _targetIp = value;
+                }
+                else
+                {
+                    _targetIp = ResolveIpAddressFromDomain(value);
+                }
+            }
+        }
+
         public byte[] SourceIp { get; private set; }
         public byte[] SourceMac { get; private set; }
         public byte[] TargetMac { get; private set; }
-
 
         private string stringSourceIp;
         private string stringTargetIp;
@@ -27,15 +45,15 @@ namespace proj1
         private string stringTargetMac;
 
         public ScanParams(string? networkInterface, List<string> udpPorts, List<string> tcpPorts, 
-        string targetIp, byte[] sourceIp, byte[] sourceMac, byte[] targetMac)
+        string targetIp, byte[] sourceIp, byte[] sourceMac)
         {
             NetworkInterface = networkInterface;
             UdpPorts = udpPorts;
             TcpPorts = tcpPorts;
-            TargetIp = targetIp;
+            TargetIp = targetIp;    
             SourceIp = sourceIp;
             SourceMac = sourceMac;
-            TargetMac = targetMac;
+            TargetMac = NetworkManager.GetTargetMac(this._targetIp, this.NetworkInterface);
 
             stringSourceMac = BitConverter.ToString(SourceMac);
             stringTargetMac = BitConverter.ToString(TargetMac);
@@ -43,17 +61,39 @@ namespace proj1
 
         }
 
+        private string ResolveIpAddressFromDomain(string domain)
+        {
+            // Pokúsi sa preložiť doménové meno na IP adresu
+            try
+            {
+                var addresses = Dns.GetHostAddresses(domain);
+                if (addresses.Length > 0)
+                {
+                    return addresses[0].ToString(); // Vráti prvú IP adresu z DNS prekladu
+                }
+                else
+                {
+                    throw new Exception();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error: Unable to resolve domain name.");
+                Environment.Exit(1);
+                return null;
+            }
+        }    
 
         public override string ToString()
         {
             return $"Interface: {NetworkInterface ?? "None"}\n" +
                    $"UDP Ports: {string.Join(",", UdpPorts)}\n" +
                    $"TCP Ports: {string.Join(",", TcpPorts)}\n" +
-                   $"Target IP: {TargetIp ?? "None"}\n" +
+                   $"Target IP: {this._targetIp ?? "None"}\n" +
                    $"Source IP: {stringSourceIp}\n" +
                    $"Source MAC: {stringSourceMac}\n" +
                    $"Target MAC: {stringTargetMac}\n\n" +
-                    $"Interesting ports on {TargetIp}:\n";
+                    $"Interesting ports on {this._targetIp}:\n";
 
         }
         
@@ -95,7 +135,7 @@ namespace proj1
                 udpClient.Client.ReceiveTimeout = 5000;
                 try
                 {
-                    udpClient.Connect(TargetIp, int.Parse(port));
+                    udpClient.Connect(this._targetIp, int.Parse(port));
                     udpClient.Send(new byte[] { 0 }, 1);
                     IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
                     byte[] response = udpClient.Receive(ref remoteEndPoint);
@@ -151,7 +191,7 @@ namespace proj1
             ipHeader[10] = 0x00; // Header checksum (to be filled later)
             ipHeader[11] = 0x00; // Header checksum (to be filled later)
             Array.Copy(SourceIp, 0, ipHeader, 12, 4); // Source IP
-            Array.Copy(IPAddress.Parse(TargetIp).GetAddressBytes(), 0, ipHeader, 16, 4); // Destination IP
+            Array.Copy(IPAddress.Parse(this._targetIp).GetAddressBytes(), 0, ipHeader, 16, 4); // Destination IP
 
             // Recalculate IP header checksum
             ushort ipChecksum = CalculateChecksum(ipHeader);
@@ -186,7 +226,7 @@ namespace proj1
             // Create pseudo header for TCP checksum calculation
             byte[] pseudoHeader = new byte[12 + tcpHeader.Length];
             Array.Copy(SourceIp, 0, pseudoHeader, 0, 4); // Source IP
-            Array.Copy(IPAddress.Parse(TargetIp).GetAddressBytes(), 0, pseudoHeader, 4, 4); // Destination IP
+            Array.Copy(IPAddress.Parse(this._targetIp).GetAddressBytes(), 0, pseudoHeader, 4, 4); // Destination IP
             pseudoHeader[8] = 0x00; // Reserved
             pseudoHeader[9] = 0x06; // Protocol (TCP)
 
@@ -239,7 +279,7 @@ namespace proj1
                         Array.Copy(packetData, 30, destIp, 0, 4);
 
                         // Check if the packet is from the target IP
-                        if (new IPAddress(sourceIp).ToString() == TargetIp)
+                        if (new IPAddress(sourceIp).ToString() == this._targetIp)
                         {
                             
                             // Extract the TCP header
