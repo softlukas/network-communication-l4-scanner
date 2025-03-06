@@ -113,14 +113,7 @@ namespace proj1
 
             foreach (string port in TcpPorts)
             {
-                try
-                {
-                    SendSynPacket(deviceInterface, ushort.Parse(port));
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine($"Invalid port number format: {port}");
-                }
+                SendSynPacket(deviceInterface, ushort.Parse(port));
             }
 
             deviceInterface.Close();
@@ -155,22 +148,16 @@ namespace proj1
         
         private void SendSynPacket(ILiveDevice deviceInterface, ushort destinationPort, bool resending = false) {
             
+            
             // set destination port
             byte[] destPortBytes = BitConverter.GetBytes((ushort)destinationPort);
 
             // Ensure the byte array is in network byte order (big-endian)
             if (BitConverter.IsLittleEndian)
             {
-                Array.Reverse(destPortBytes); // Ensure the byte array is in network byte order (big-endian)
+                // Ensure the byte array is in network byte order (big-endian)
+                Array.Reverse(destPortBytes); 
             }
-
-
-            // Create Ethernet frame
-            byte[] ethernetFrame = new byte[14];
-            Array.Copy(TargetMac, 0, ethernetFrame, 0, 6); // Destination MAC
-            Array.Copy(SourceMac, 0, ethernetFrame, 6, 6); // Source MAC
-            ethernetFrame[12] = 0x08; // Ethernet type (IPv4)
-            ethernetFrame[13] = 0x00;
 
             // Create IP header
             byte[] ipHeader = new byte[20];
@@ -190,8 +177,10 @@ namespace proj1
             ipHeader[9] = 0x06; // Protocol (TCP)
             ipHeader[10] = 0x00; // Header checksum (to be filled later)
             ipHeader[11] = 0x00; // Header checksum (to be filled later)
+
             Array.Copy(SourceIp, 0, ipHeader, 12, 4); // Source IP
-            Array.Copy(IPAddress.Parse(this._targetIp).GetAddressBytes(), 0, ipHeader, 16, 4); // Destination IP
+            // Destination IP
+            Array.Copy(IPAddress.Parse(this._targetIp).GetAddressBytes(), 0, ipHeader, 16, 4); 
 
             // Recalculate IP header checksum
             ushort ipChecksum = CalculateChecksum(ipHeader);
@@ -226,7 +215,8 @@ namespace proj1
             // Create pseudo header for TCP checksum calculation
             byte[] pseudoHeader = new byte[12 + tcpHeader.Length];
             Array.Copy(SourceIp, 0, pseudoHeader, 0, 4); // Source IP
-            Array.Copy(IPAddress.Parse(this._targetIp).GetAddressBytes(), 0, pseudoHeader, 4, 4); // Destination IP
+            // Destination IP
+            Array.Copy(IPAddress.Parse(this._targetIp).GetAddressBytes(), 0, pseudoHeader, 4, 4); 
             pseudoHeader[8] = 0x00; // Reserved
             pseudoHeader[9] = 0x06; // Protocol (TCP)
 
@@ -241,15 +231,26 @@ namespace proj1
             tcpHeader[16] = (byte)(tcpChecksum >> 8);
             tcpHeader[17] = (byte)(tcpChecksum & 0xFF);
 
-            // Combine Ethernet, IP, and TCP headers into a single packet
-            byte[] packet = new byte[ethernetFrame.Length + ipHeader.Length + tcpHeader.Length];
-            
-            Array.Copy(ethernetFrame, 0, packet, 0, ethernetFrame.Length);
-            Array.Copy(ipHeader, 0, packet, ethernetFrame.Length, ipHeader.Length);
-            Array.Copy(tcpHeader, 0, packet, ethernetFrame.Length + ipHeader.Length, tcpHeader.Length);
+        
+            // Create a raw socket
+            Socket rawSocket = new Socket(AddressFamily.InterNetwork, SocketType.Raw, ProtocolType.Tcp);
+            rawSocket.Bind(new IPEndPoint(new IPAddress(SourceIp), 0));
+            rawSocket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.HeaderIncluded, true);
+
+            // Enable IP header inclusion
+            byte[] optionIn = new byte[4] { 1, 0, 0, 0 };
+            byte[] optionOut = new byte[4];
+
+            // Combine IP and TCP headers into a single packet
+            byte[] packet = new byte[ipHeader.Length + tcpHeader.Length];
+            Array.Copy(ipHeader, 0, packet, 0, ipHeader.Length);
+            Array.Copy(tcpHeader, 0, packet, ipHeader.Length, tcpHeader.Length);
 
             // Send the packet
-            deviceInterface.SendPacket(packet);
+            rawSocket.SendTo(packet, new IPEndPoint(IPAddress.Parse(this._targetIp), destinationPort));
+
+            // Close the raw socket
+            rawSocket.Close();
 
             // set timeout
             DateTime startTime = DateTime.Now;
@@ -273,6 +274,7 @@ namespace proj1
                     if (packetData[23] == 0x06)
                     {
                         // Extract the source and destination IP addresses
+                        
                         byte[] sourceIp = new byte[4];
                         byte[] destIp = new byte[4];
                         Array.Copy(packetData, 26, sourceIp, 0, 4);
