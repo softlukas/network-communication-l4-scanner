@@ -36,10 +36,8 @@ namespace proj1
                     udpPorts: options.UdpPorts?.Split(',').ToList() ?? new List<string>(),
                     tcpPorts: options.TcpPorts?.Split(',').ToList() ?? new List<string>(),
 
-                    targetIp: options.TargetIp,
-
-                    sourceIp: NetworkManager.GetSourceIPAddress(options.Interface),
-                    sourceMac: NetworkManager.GetSourceMacAddress(options.Interface)
+                    targetIp: options.TargetIp
+                    
                 );
 
                 
@@ -60,8 +58,13 @@ namespace proj1
             });
 
             Console.WriteLine(scanParams.ToString());
-
+            
+            
+            
             scanParams.ScanTcpPorts();
+            
+            
+            
 
         }
     }

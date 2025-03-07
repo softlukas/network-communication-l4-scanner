@@ -16,6 +16,14 @@ namespace proj1
         public List<string> UdpPorts { get; private set; }
         public List<string> TcpPorts { get; private set; }
 
+        public enum IpVersion
+        {
+            IPv4,
+            IPv6
+        }
+        
+        public IpVersion IpAddressFormat { get; private set; }
+
         private string _targetIp;
 
         // if target ip is domain name, use DNS
@@ -32,6 +40,12 @@ namespace proj1
                 {
                     _targetIp = ResolveIpAddressFromDomain(value);
                 }
+                // set ipv4/ipv6
+                if(NetworkManager.IsIpv6Address(_targetIp))
+                    IpAddressFormat = IpVersion.IPv6;
+                else {
+                    IpAddressFormat = IpVersion.IPv4;
+                }
             }
         }
 
@@ -41,22 +55,18 @@ namespace proj1
 
         private string stringSourceIp;
         private string stringTargetIp;
-        private string stringSourceMac;
-        private string stringTargetMac;
+       
 
         public ScanParams(string? networkInterface, List<string> udpPorts, List<string> tcpPorts, 
-        string targetIp, byte[] sourceIp, byte[] sourceMac)
+        string targetIp)
         {
             NetworkInterface = networkInterface;
             UdpPorts = udpPorts;
             TcpPorts = tcpPorts;
-            TargetIp = targetIp;    
-            SourceIp = sourceIp;
-            SourceMac = sourceMac;
-            TargetMac = NetworkManager.GetTargetMac(this._targetIp, this.NetworkInterface);
-
-            stringSourceMac = BitConverter.ToString(SourceMac);
-            stringTargetMac = BitConverter.ToString(TargetMac);
+            TargetIp = targetIp;
+            
+                
+            SourceIp = NetworkManager.GetSourceIpAddress(networkInterface, IpAddressFormat);
             stringSourceIp = new IPAddress(SourceIp).ToString();
 
         }
@@ -91,13 +101,24 @@ namespace proj1
                    $"TCP Ports: {string.Join(",", TcpPorts)}\n" +
                    $"Target IP: {this._targetIp ?? "None"}\n" +
                    $"Source IP: {stringSourceIp}\n" +
-                   $"Source MAC: {stringSourceMac}\n" +
-                   $"Target MAC: {stringTargetMac}\n\n" +
+                   $"IpVersion: {IpAddressFormat}\n\n" +
+                   $"IpVersion: {IpAddressFormat}\n\n" +
                     $"Interesting ports on {this._targetIp}:\n";
 
         }
         
         public void ScanTcpPorts() {
+            if(IpAddressFormat == IpVersion.IPv4)
+            {
+                ScanTcpPortsIpv4();
+            }
+            else
+            {
+                ScanTcpPortsIpv6();
+            }
+        }
+
+        private void ScanTcpPortsIpv4() {
 
             // Find the specified network interface
             var devices = CaptureDeviceList.Instance;
@@ -118,6 +139,10 @@ namespace proj1
 
             deviceInterface.Close();
 
+        }
+
+        private void ScanTcpPortsIpv6() {
+            
         }
 
         public void UdpScan() {

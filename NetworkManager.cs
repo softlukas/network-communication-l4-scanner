@@ -11,43 +11,6 @@ namespace proj1
     static class NetworkManager
     {
 
-        //public enum IpVersion
-        //{
-            //IPv4,
-            //IPv6
-        //}
-        
-        public static byte[] GetTargetMac(string targetIp, string networkInterface) 
-        {
-            
-            // get source IP and MAC
-            byte[] sourceIp = GetSourceIPAddress(networkInterface);
-            byte[] sourceMac = GetSourceMacAddress(networkInterface);
-
-            Console.WriteLine("Source ipv6 IP: " + new IPAddress(sourceIp));
-
-            IPAddress ipAddress = IPAddress.Parse(targetIp);
-            byte[] targetIpBytes = ipAddress.GetAddressBytes();
-
-            if(!IsIpv6Address(targetIp)) {
-                if(!IsPrivateIp(targetIp))
-                {
-                    targetIpBytes = GetGatewayIP(networkInterface);
-                }
-
-                byte[] ethernetPacket = BuildArpRequest(sourceMac, sourceIp, targetIpBytes);
-                
-                // send ARP request packet -> get dest MAC
-        
-                return SendArpRequest(ethernetPacket, networkInterface, targetIpBytes);
-            }
-            else {
-                byte[] ipv6Packet = BuildTargetMacIpv6Packet(sourceMac, sourceIp, targetIpBytes);
-                return SendTargetMacIpv6Packet(ipv6Packet, networkInterface, targetIpBytes);
-            }
-
-                
-        }
         
         public static bool IsIpv6Address(string ipAddress)
         {
@@ -62,7 +25,9 @@ namespace proj1
                     return true;
                 }
             }
-            return false;
+            Console.WriteLine("Error: Invalid IP address format.");
+            Environment.Exit(1);
+            return false;   
         }
 
         private static bool IsPrivateIp(string ipAddress)
@@ -119,7 +84,7 @@ namespace proj1
 
         
 
-        public static byte[] GetSourceIPAddress(string interface_name, bool isIpv6 = true)
+        public static byte[] GetSourceIpAddress(string interface_name, ScanParams.IpVersion ipAddressFormat)
         {
             // Find the network interface with the given name
             foreach (var netInterface in NetworkInterface.GetAllNetworkInterfaces())
@@ -130,7 +95,7 @@ namespace proj1
                     foreach (var unicastAddress in netInterface.GetIPProperties().UnicastAddresses)
                     {
                         // If the requested IP version is IPv6
-                        if (isIpv6 && 
+                        if (ipAddressFormat ==  ScanParams.IpVersion.IPv6 && 
                             unicastAddress.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
                         {
                             // Ignore loopback addresses
@@ -141,7 +106,7 @@ namespace proj1
                         }
 
                         // If the requested IP version is IPv4
-                        if (!isIpv6 && 
+                        if (ipAddressFormat ==  ScanParams.IpVersion.IPv4 && 
                             unicastAddress.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
                         {
                             // Ignore loopback addresses
