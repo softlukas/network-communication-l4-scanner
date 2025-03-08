@@ -3,3 +3,4 @@
 proj1.sln
 .vscode/
 TCPPacketSender.cs
+*.sh
