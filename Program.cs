@@ -62,7 +62,7 @@ namespace proj1
             
             
             scanParams.ScanTcpPorts();
-            
+            scanParams.ScanUdpPorts();
             
             
 

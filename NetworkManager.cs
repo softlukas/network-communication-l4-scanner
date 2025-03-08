@@ -359,7 +359,28 @@ namespace proj1
             
         }
 
-       
+        public static byte[] BuildUpdPacket(int srcPort, int destPort)
+        {
+            byte[] packet = new byte[8]; // UDP header (8B)
+
+            // source port
+            packet[0] = (byte)(srcPort >> 8);
+            packet[1] = (byte)(srcPort & 0xFF);
+
+            // destination port
+            packet[2] = (byte)(destPort >> 8);
+            packet[3] = (byte)(destPort & 0xFF);
+
+            // packet length (8B header + 0B payload)
+            packet[4] = 0x00;
+            packet[5] = 0x08;
+
+            // checksum
+            packet[6] = 0x00;
+            packet[7] = 0x00;
+
+            return packet;
+        }
 
 
     }

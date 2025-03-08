@@ -64,13 +64,13 @@ namespace proj1
             UdpPorts = udpPorts;
             TcpPorts = tcpPorts;
             TargetIp = targetIp;
-            
-                
+
+
             SourceIp = NetworkManager.GetSourceIpAddress(networkInterface, IpAddressFormat);
             stringSourceIp = new IPAddress(SourceIp).ToString();
 
         }
-
+        
         private string ResolveIpAddressFromDomain(string domain)
         {
             // Pokúsi sa preložiť doménové meno na IP adresu
@@ -141,11 +141,98 @@ namespace proj1
 
         }
 
-        private void ScanTcpPortsIpv6() {
-            
-        }
+        
 
-        public void UdpScan() {
+        public void ScanUdpPorts() {
+
+            Socket udpSocket = new Socket(AddressFamily.InterNetwork, SocketType.Raw, ProtocolType.Udp);
+    
+
+            // Create a capture device for listening to ICMP responses
+            var devices = CaptureDeviceList.Instance;
+            ILiveDevice deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
+
+            if (deviceInterface == null)
+            {
+                Console.WriteLine($"Interface {NetworkInterface} not found.");
+                return;
+            }
+
+            deviceInterface.Open();
+            
+            foreach(string port in UdpPorts) {
+                Console.WriteLine("test");
+                Console.WriteLine($"Scanning UDP port {port}...");
+            }
+
+
+            foreach(string destPort in UdpPorts)
+            {
+                Console.WriteLine("Scanning udp port {0}", destPort);
+                byte[] udpPacket = NetworkManager.BuildUpdPacket(12345, int.Parse(destPort));
+                byte[] targetIpBytes = IPAddress.Parse(this._targetIp).GetAddressBytes();
+
+                IPEndPoint target = new IPEndPoint(new IPAddress(targetIpBytes), int.Parse(destPort));
+                udpSocket.SendTo(udpPacket, target);
+                Console.WriteLine("udp packet sent");
+                // Set timeout for receiving ICMP response
+                DateTime startTime = DateTime.Now;
+                TimeSpan timeout = TimeSpan.FromSeconds(2);
+                bool portMarkedFlag = false;
+                while (DateTime.Now - startTime < timeout)
+                {
+                    PacketCapture rawPacket;
+                    // Read the next packet from the network deviceInterface
+                    if (deviceInterface.GetNextPacket(out rawPacket) != GetPacketStatus.PacketRead)
+                    {
+                        continue;
+                    }
+
+                    byte[] packetData = rawPacket.Data.ToArray();
+                    Console.WriteLine("packet received");
+
+                    // Check if the packet is an ICMP packet
+                    if (packetData.Length >= 28 && packetData[23] == 0x01 && 
+                    packetData[34] == 0x03 && packetData[35] == 0x03)
+                    {
+                       
+                        
+                        Console.WriteLine("packet is icmp");
+                        // Extract the source and destination IP addresses
+                        byte[] sourceIp = new byte[4];
+                        byte[] destIp = new byte[4];
+                        Array.Copy(packetData, 26, sourceIp, 0, 4);
+                        Array.Copy(packetData, 30, destIp, 0, 4);
+                
+                        // Check if the packet is from the target IP
+                        if (new IPAddress(sourceIp).ToString() == this._targetIp)
+                        {
+                            Console.WriteLine("{0}/udp closed", destPort);
+                            portMarkedFlag = true;
+                            break;
+                        }
+                        
+                    }
+                    
+                        
+                    
+                }
+                if(!portMarkedFlag) {
+                    Console.WriteLine("{0}/udp open", destPort);
+                }
+                
+               
+                
+            }
+            deviceInterface.Close();
+                
+                
+                
+                
+            
+
+
+            /*
             foreach (string port in UdpPorts)
             {
                 Console.WriteLine($"Scanning UDP port {port}...");
@@ -168,6 +255,7 @@ namespace proj1
                     udpClient.Close();
                 }
             }
+            */
         }
 
         
