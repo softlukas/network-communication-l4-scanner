@@ -160,21 +160,14 @@ namespace proj1
 
             deviceInterface.Open();
             
-            foreach(string port in UdpPorts) {
-                Console.WriteLine("test");
-                Console.WriteLine($"Scanning UDP port {port}...");
-            }
-
-
             foreach(string destPort in UdpPorts)
             {
-                Console.WriteLine("Scanning udp port {0}", destPort);
                 byte[] udpPacket = NetworkManager.BuildUpdPacket(12345, int.Parse(destPort));
                 byte[] targetIpBytes = IPAddress.Parse(this._targetIp).GetAddressBytes();
 
                 IPEndPoint target = new IPEndPoint(new IPAddress(targetIpBytes), int.Parse(destPort));
                 udpSocket.SendTo(udpPacket, target);
-                Console.WriteLine("udp packet sent");
+                
                 // Set timeout for receiving ICMP response
                 DateTime startTime = DateTime.Now;
                 TimeSpan timeout = TimeSpan.FromSeconds(2);
@@ -189,7 +182,6 @@ namespace proj1
                     }
 
                     byte[] packetData = rawPacket.Data.ToArray();
-                    Console.WriteLine("packet received");
 
                     // Check if the packet is an ICMP packet
                     if (packetData.Length >= 28 && packetData[23] == 0x01 && 
@@ -197,7 +189,7 @@ namespace proj1
                     {
                        
                         
-                        Console.WriteLine("packet is icmp");
+                        
                         // Extract the source and destination IP addresses
                         byte[] sourceIp = new byte[4];
                         byte[] destIp = new byte[4];
@@ -225,37 +217,7 @@ namespace proj1
                 
             }
             deviceInterface.Close();
-                
-                
-                
-                
             
-
-
-            /*
-            foreach (string port in UdpPorts)
-            {
-                Console.WriteLine($"Scanning UDP port {port}...");
-                UdpClient udpClient = new UdpClient();
-                udpClient.Client.ReceiveTimeout = 5000;
-                try
-                {
-                    udpClient.Connect(this._targetIp, int.Parse(port));
-                    udpClient.Send(new byte[] { 0 }, 1);
-                    IPEndPoint remoteEndPoint = new IPEndPoint(IPAddress.Any, 0);
-                    byte[] response = udpClient.Receive(ref remoteEndPoint);
-                    Console.WriteLine($"UDP port {port} open.");
-                }
-                catch (SocketException)
-                {
-                    Console.WriteLine($"UDP port {port} closed.");
-                }
-                finally
-                {
-                    udpClient.Close();
-                }
-            }
-            */
         }
 
         

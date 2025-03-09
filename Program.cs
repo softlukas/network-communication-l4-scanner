@@ -20,13 +20,6 @@ namespace proj1
                     return;
                 }
 
-                Console.WriteLine($"Interface: {options.Interface ?? "None"}");
-                Console.WriteLine($"TCP Ports: {options.TcpPorts ?? "None"}");
-                Console.WriteLine($"UDP Ports: {options.UdpPorts ?? "None"}");
-                Console.WriteLine($"Timeout: {options.Timeout} ms");
-                Console.WriteLine($"Target: {options.TargetIp ?? "None"}");
-                
-
                 // create OOP representation of the command line arguments
                 scanParams = new ScanParams
                 (
@@ -40,12 +33,6 @@ namespace proj1
                     
                 );
 
-                
-
-                foreach(string item in scanParams.UdpPorts)
-                {
-                    Console.WriteLine(item);
-                }
                 
             })
             .WithNotParsed(errors =>
@@ -62,6 +49,7 @@ namespace proj1
             
             
             scanParams.ScanTcpPorts();
+            Console.WriteLine("Scanning UDP ports...");
             scanParams.ScanUdpPorts();
             
             
