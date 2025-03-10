@@ -26,18 +26,20 @@ namespace proj1
                     Environment.Exit(1);
                 }
 
+
+                
+
                 // create OOP representation of the command line arguments
                 scanParams = new ScanParams
                 (
                     networkInterface: options.Interface,
 
                     // if udp/tcp ports null, create empty list
-                    udpPorts: options.UdpPorts?.Split(',').ToList() ?? new List<string>(),
-                    tcpPorts: options.TcpPorts?.Split(',').ToList() ?? new List<string>(),
+                    tcpPorts: string.IsNullOrEmpty(options.TcpPorts) ? new List<string>() : FillPortsList(options.TcpPorts),
+                    udpPorts: string.IsNullOrEmpty(options.UdpPorts) ? new List<string>() : FillPortsList(options.UdpPorts),
 
                     targetIp: options.TargetIp,
                     timeout: options.Timeout
-                    
                 );
 
                 
@@ -57,6 +59,32 @@ namespace proj1
             
             
 
+        }
+
+        private static List<string> FillPortsList(string ports)
+        {
+            List<string> portsList = new List<string>();
+            
+            var portSegments = ports.Split(',');
+            foreach (var segment in portSegments)
+            {
+                if (segment.Contains("-"))
+                {
+                    var portRange = segment.Split('-');
+                    int startPort = int.Parse(portRange[0]);
+                    int endPort = int.Parse(portRange[1]);
+
+                    for (int port = startPort; port <= endPort; port++)
+                    {
+                        portsList.Add(port.ToString());
+                    }
+                }
+                else
+                {
+                    portsList.Add(segment);
+                }
+            }
+            return portsList;
         }
     }
 }
