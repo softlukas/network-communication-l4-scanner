@@ -14,7 +14,7 @@ namespace proj1
         public string? TcpPorts { get; set; }
 
         [Option('w', "wait", Required = false, Default = 5000, HelpText = "Timeout in milliseconds for each port scan.")]
-        public int? Timeout { get; set; }
+        public int Timeout { get; set; }
 
         [Value(0, MetaName = "target", Required = false, HelpText = "Target domain name or IP address to scan.")]
         public string? TargetIp { get; set; }

@@ -52,19 +52,20 @@ namespace proj1
         public byte[] SourceIp { get; private set; }
         public byte[] SourceMac { get; private set; }
         public byte[] TargetMac { get; private set; }
+        public int Timeout {get; private set;}
 
         private string stringSourceIp;
         private string stringTargetIp;
        
 
         public ScanParams(string? networkInterface, List<string> udpPorts, List<string> tcpPorts, 
-        string targetIp)
+        string targetIp, int timeout)
         {
             NetworkInterface = networkInterface;
             UdpPorts = udpPorts;
             TcpPorts = tcpPorts;
             TargetIp = targetIp;
-
+            Timeout = timeout;
 
             SourceIp = NetworkManager.GetSourceIpAddress(networkInterface, IpAddressFormat);
             stringSourceIp = new IPAddress(SourceIp).ToString();
@@ -103,6 +104,7 @@ namespace proj1
                    $"Source IP: {stringSourceIp}\n" +
                    $"IpVersion: {IpAddressFormat}\n\n" +
                    $"IpVersion: {IpAddressFormat}\n\n" +
+                   $"Timeout: {Timeout}\n\n" +
                     $"Interesting ports on {this._targetIp}:\n";
 
         }
@@ -170,7 +172,7 @@ namespace proj1
                 
                 // Set timeout for receiving ICMP response
                 DateTime startTime = DateTime.Now;
-                TimeSpan timeout = TimeSpan.FromSeconds(2);
+                TimeSpan timeout = TimeSpan.FromMilliseconds(Timeout);
                 bool portMarkedFlag = false;
                 while (DateTime.Now - startTime < timeout)
                 {
@@ -329,7 +331,7 @@ namespace proj1
 
             // set timeout
             DateTime startTime = DateTime.Now;
-            TimeSpan timeout = TimeSpan.FromSeconds(2);
+            TimeSpan timeout = TimeSpan.FromMilliseconds(Timeout);
 
             while (DateTime.Now - startTime < timeout)
             {

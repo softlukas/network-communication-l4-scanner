@@ -1,5 +1,6 @@
 ﻿using System;
 using CommandLine;
+using System.Net.NetworkInformation;
 
 
 
@@ -13,11 +14,16 @@ namespace proj1
             Parser.Default.ParseArguments<ArgsOptions>(args)
             .WithParsed(options =>
             {
-                if (string.IsNullOrEmpty(options.Interface) && string.IsNullOrEmpty(options.TargetIp))
-                {
+                // if interface or target is not set
+                if (string.IsNullOrEmpty(options.Interface) || string.IsNullOrEmpty(options.TargetIp)) {
                     Console.WriteLine("Listing active interfaces...");
-                    
-                    return;
+
+                    var interfaces = NetworkInterface.GetAllNetworkInterfaces();
+                    foreach (var ni in interfaces)
+                    {
+                        Console.WriteLine($"Name: {ni.Name}, Description: {ni.Description}, Status: {ni.OperationalStatus}");
+                    }
+                    Environment.Exit(1);
                 }
 
                 // create OOP representation of the command line arguments
@@ -29,7 +35,8 @@ namespace proj1
                     udpPorts: options.UdpPorts?.Split(',').ToList() ?? new List<string>(),
                     tcpPorts: options.TcpPorts?.Split(',').ToList() ?? new List<string>(),
 
-                    targetIp: options.TargetIp
+                    targetIp: options.TargetIp,
+                    timeout: options.Timeout
                     
                 );
 
@@ -37,11 +44,7 @@ namespace proj1
             })
             .WithNotParsed(errors =>
             {
-                Console.WriteLine("Invalid arguments provided.");
-                foreach (var error in errors)
-                {
-                    Console.WriteLine(error.ToString());
-                }
+                Console.WriteLine("Error");   
             });
 
             Console.WriteLine(scanParams.ToString());
