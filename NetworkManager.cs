@@ -98,15 +98,29 @@ namespace proj1
             return packet;
         }
 
+        public static string ResolveIpAddressFromDomain(string domain)
+        {
+            
+            try
+            {
+                var addresses = Dns.GetHostAddresses(domain);
+                if (addresses.Length > 0)
+                {
+                    return addresses[0].ToString();
+                }
+                else
+                {
+                    throw new Exception();
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine("Error: Unable to resolve domain name.");
+                Environment.Exit(1);
+                return null;
+            }
+        }    
+
 
     }
-
-
-        
-
-
-        
-        
-    
-    
 }

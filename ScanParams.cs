@@ -38,7 +38,7 @@ namespace proj1
                 }
                 else
                 {
-                    _targetIp = ResolveIpAddressFromDomain(value);
+                    _targetIp = NetworkManager.ResolveIpAddressFromDomain(value);
                 }
                 // set ipv4/ipv6
                 if(NetworkManager.IsIpv6Address(_targetIp))
@@ -72,28 +72,7 @@ namespace proj1
 
         }
         
-        private string ResolveIpAddressFromDomain(string domain)
-        {
-            // Pokúsi sa preložiť doménové meno na IP adresu
-            try
-            {
-                var addresses = Dns.GetHostAddresses(domain);
-                if (addresses.Length > 0)
-                {
-                    return addresses[0].ToString(); // Vráti prvú IP adresu z DNS prekladu
-                }
-                else
-                {
-                    throw new Exception();
-                }
-            }
-            catch (Exception ex)
-            {
-                Console.WriteLine("Error: Unable to resolve domain name.");
-                Environment.Exit(1);
-                return null;
-            }
-        }    
+        
 
         public override string ToString()
         {
@@ -205,37 +184,30 @@ namespace proj1
                             portMarkedFlag = true;
                             break;
                         }
-                        
                     }
-                    
-                        
-                    
                 }
-                if(!portMarkedFlag) {
+
+                if (!portMarkedFlag)
+                {
                     Console.WriteLine("{0}/udp open", destPort);
                 }
-                
-               
+
                 
             }
             deviceInterface.Close();
+            rawSocket.Close();
             
         }
 
         
         private void SendSynPacket(ILiveDevice deviceInterface, ushort destinationPort, bool resending = false) {
             
-            
             // set destination port
-            byte[] destPortBytes = BitConverter.GetBytes((ushort)destinationPort);
+            byte[] destPortBytes = SetPortBytes(destinationPort);
 
-            // Ensure the byte array is in network byte order (big-endian)
-            if (BitConverter.IsLittleEndian)
-            {
-                // Ensure the byte array is in network byte order (big-endian)
-                Array.Reverse(destPortBytes); 
-            }
-
+            const ushort sourcePort = 12345;
+            byte[] sourcePortBytes = SetPortBytes(sourcePort);
+            
             // Create IP header
             byte[] ipHeader = new byte[20];
             ipHeader[0] = 0x45; // Version and header length
@@ -266,8 +238,9 @@ namespace proj1
 
             // Create TCP header
             byte[] tcpHeader = new byte[20];
-            tcpHeader[0] = 0x30; // Source port (12345)
-            tcpHeader[1] = 0x39; // Source port (12345)
+            
+            tcpHeader[0] = sourcePortBytes[0]; // High byte of source port
+            tcpHeader[1] = sourcePortBytes[1]; // Low byte of source port
             tcpHeader[2] = destPortBytes[0]; // High byte of destination port
             tcpHeader[3] = destPortBytes[1]; // Low byte of destination port
 
@@ -344,43 +317,37 @@ namespace proj1
 
                 byte[] packetData = rawPacket.Data.ToArray();
 
+                if(!MatchReplyPortIpAddresses(packetData, destinationPort, sourcePort))
+                {
+                    continue;
+                }
+
                 // Check if the packet is an IP packet
                 if (packetData.Length >= 34 && packetData[12] == 0x08 && packetData[13] == 0x00)
                 {
                     // Check if the packet is a TCP packet
                     if (packetData[23] == 0x06)
                     {
-                        // Extract the source and destination IP addresses
-                        
-                        byte[] sourceIp = new byte[4];
-                        byte[] destIp = new byte[4];
-                        Array.Copy(packetData, 26, sourceIp, 0, 4);
-                        Array.Copy(packetData, 30, destIp, 0, 4);
-
-                        // Check if the packet is from the target IP
-                        if (new IPAddress(sourceIp).ToString() == this._targetIp)
-                        {
                             
-                            // Extract the TCP header
-                            byte[] tcpHeaderReceived = new byte[20];
-                            Array.Copy(packetData, 34, tcpHeaderReceived, 0, 20);
+                        // Extract the TCP header
+                        byte[] tcpHeaderReceived = new byte[20];
+                        Array.Copy(packetData, 34, tcpHeaderReceived, 0, 20);
+                    
+                        // Check if the packet is a SYN-ACK packet
+                        if ((tcpHeaderReceived[13] & 0x12) == 0x12) // SYN and ACK flags set
+                        {
+                            Console.WriteLine("{0}/tcp open", destinationPort);
+                            return;
+                        }
+
+                        // Check if the packet is a RST packet
+                        if ((tcpHeaderReceived[13] & 0x04) == 0x04 && resending == false) // RST flag set
+                        {
+                            Console.WriteLine("{0}/tcp closed", destinationPort);
+                            return;
+                        }
 
                         
-                            // Check if the packet is a SYN-ACK packet
-                            if ((tcpHeaderReceived[13] & 0x12) == 0x12) // SYN and ACK flags set
-                            {
-                                Console.WriteLine("{0}/tcp open", destinationPort);
-                                return;
-                            }
-
-                            // Check if the packet is a RST packet
-                            if ((tcpHeaderReceived[13] & 0x04) == 0x04 && resending == false) // RST flag set
-                            {
-                                Console.WriteLine("{0}/tcp closed", destinationPort);
-                                return;
-                            }
-
-                        }
                     }
                 }
             }
@@ -412,6 +379,39 @@ namespace proj1
                 }
             }
             return (ushort)~sum;
+        }
+
+        private bool MatchReplyPortIpAddresses(byte[] packetData, ushort destinationPort, ushort sourcePort)
+        {
+            // Extract the source and destination IP addresses
+            byte[] sourceIp = new byte[4];
+            byte[] destIp = new byte[4];
+            Array.Copy(packetData, 26, sourceIp, 0, 4);
+            Array.Copy(packetData, 30, destIp, 0, 4);
+
+            // Check if the packet is from the target IP
+            if (new IPAddress(sourceIp).ToString() == this._targetIp)
+            {
+                // Extract the source and destination ports
+                ushort replySrcPort = (ushort)((packetData[34] << 8) + packetData[35]);
+                ushort replyDestPort = (ushort)((packetData[36] << 8) + packetData[37]);
+
+                // Check if the ports match
+                if (replySrcPort == destinationPort && replyDestPort == sourcePort)
+                {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private byte[] SetPortBytes(ushort port) {
+            byte[] portBytes = BitConverter.GetBytes(port);
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(portBytes);
+            }
+            return portBytes;
         }
     
     }
