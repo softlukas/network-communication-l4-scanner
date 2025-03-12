@@ -24,6 +24,17 @@ namespace proj1
         
         public IpVersion IpAddressFormat { get; private set; }
 
+        private enum PortState {
+            open,
+            closed,
+            filtered
+        }
+
+        private enum Protocol {
+            tcp,
+            udp
+        }
+
         private string _targetIp;
 
         // if target ip is domain name, use DNS
@@ -165,22 +176,20 @@ namespace proj1
                     byte[] packetData = rawPacket.Data.ToArray();
 
                     // Check if the packet is an ICMP packet
-                    if (packetData.Length >= 28 && packetData[23] == 0x01 && 
-                    packetData[34] == 0x03 && packetData[35] == 0x03)
+                    if (packetData.Length >= 28 && packetData[23] == 0x01 &&
+                        packetData[34] == 0x03 && packetData[35] == 0x03)
                     {
-                       
-                        
-                        
                         // Extract the source and destination IP addresses
                         byte[] sourceIp = new byte[4];
                         byte[] destIp = new byte[4];
                         Array.Copy(packetData, 26, sourceIp, 0, 4);
                         Array.Copy(packetData, 30, destIp, 0, 4);
-                
+
                         // Check if the packet is from the target IP
                         if (new IPAddress(sourceIp).ToString() == this._targetIp)
                         {
-                            Console.WriteLine("{0}/udp closed", destPort);
+                            // port is closed
+                            Console.WriteLine("{0} {1} {2} {3}", this._targetIp, destPort, Protocol.udp, PortState.closed);
                             portMarkedFlag = true;
                             break;
                         }
@@ -189,7 +198,8 @@ namespace proj1
 
                 if (!portMarkedFlag)
                 {
-                    Console.WriteLine("{0}/udp open", destPort);
+                    // port is open
+                    Console.WriteLine("{0} {1} {2} {3}", this._targetIp, destPort, Protocol.udp, PortState.open);
                 }
 
                 
@@ -336,14 +346,16 @@ namespace proj1
                         // Check if the packet is a SYN-ACK packet
                         if ((tcpHeaderReceived[13] & 0x12) == 0x12) // SYN and ACK flags set
                         {
-                            Console.WriteLine("{0}/tcp open", destinationPort);
+                            // port is open
+                            Console.WriteLine("{0} {1} {2} {3}", this._targetIp, destinationPort, Protocol.tcp, PortState.open);
                             return;
                         }
 
                         // Check if the packet is a RST packet
                         if ((tcpHeaderReceived[13] & 0x04) == 0x04 && resending == false) // RST flag set
                         {
-                            Console.WriteLine("{0}/tcp closed", destinationPort);
+                            // port is closed
+                            Console.WriteLine("{0} {1} {2} {3}", this._targetIp, destinationPort, Protocol.tcp, PortState.closed);
                             return;
                         }
 
@@ -359,7 +371,8 @@ namespace proj1
             // mark port as filtered after resending
             if(resending == true)
             {
-                Console.WriteLine("{0}/tcp filtered", destinationPort);
+                // port is filtered
+                Console.WriteLine("{0} {1} {2} {3}", this._targetIp, destinationPort, Protocol.tcp, PortState.filtered);
             }
             
 

@@ -54,7 +54,7 @@ namespace proj1
             
             
             scanParams.ScanTcpPorts();
-            Console.WriteLine("Scanning UDP ports...");
+            
             scanParams.ScanUdpPorts();
             
             
