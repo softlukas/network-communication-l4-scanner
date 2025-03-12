@@ -46,22 +46,14 @@ namespace proj1
                         if (ipAddressFormat ==  ScanParams.IpVersion.IPv6 && 
                             unicastAddress.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetworkV6)
                         {
-                            // Ignore loopback addresses
-                            if (!IPAddress.IsLoopback(unicastAddress.Address))
-                            {
-                                return unicastAddress.Address.GetAddressBytes(); // Return the first valid IPv6 address found
-                            }
+                            return unicastAddress.Address.GetAddressBytes(); // Return the first valid IPv6 address found
                         }
 
                         // If the requested IP version is IPv4
                         if (ipAddressFormat ==  ScanParams.IpVersion.IPv4 && 
                             unicastAddress.Address.AddressFamily == System.Net.Sockets.AddressFamily.InterNetwork)
                         {
-                            // Ignore loopback addresses
-                            if (!IPAddress.IsLoopback(unicastAddress.Address))
-                            {
-                                return unicastAddress.Address.GetAddressBytes(); // Return the first valid IPv4 address found
-                            }
+                            return unicastAddress.Address.GetAddressBytes(); // Return the first valid IPv4 address found
                         }
                     }
                 }
