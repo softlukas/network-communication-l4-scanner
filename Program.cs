@@ -15,7 +15,7 @@ namespace proj1
             .WithParsed(options =>
             {
                 // if interface or target is not set
-                if (string.IsNullOrEmpty(options.Interface) || string.IsNullOrEmpty(options.TargetIp)) {
+                if (string.IsNullOrEmpty(options.Interface) || string.IsNullOrEmpty(options.Target)) {
                     Console.WriteLine("Listing active interfaces...");
 
                     var interfaces = NetworkInterface.GetAllNetworkInterfaces();
@@ -38,7 +38,7 @@ namespace proj1
                     tcpPorts: string.IsNullOrEmpty(options.TcpPorts) ? new List<string>() : FillPortsList(options.TcpPorts),
                     udpPorts: string.IsNullOrEmpty(options.UdpPorts) ? new List<string>() : FillPortsList(options.UdpPorts),
 
-                    targetIp: options.TargetIp,
+                    target: options.Target,
                     timeout: options.Timeout
                 );
 
@@ -55,7 +55,7 @@ namespace proj1
             
             scanParams.ScanTcpPorts();
             
-            scanParams.ScanUdpPorts();
+            //scanParams.ScanUdpPorts();
             
             
 

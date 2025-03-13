@@ -90,7 +90,7 @@ namespace proj1
             return packet;
         }
 
-        public static string ResolveIpAddressFromDomain(string domain)
+        public static List<string> ResolveIpsFromDomain(string domain)
         {
             
             try
@@ -98,7 +98,7 @@ namespace proj1
                 var addresses = Dns.GetHostAddresses(domain);
                 if (addresses.Length > 0)
                 {
-                    return addresses[0].ToString();
+                    return addresses.Select(address => address.ToString()).ToList();
                 }
                 else
                 {
