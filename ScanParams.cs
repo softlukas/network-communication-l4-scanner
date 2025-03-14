@@ -466,11 +466,24 @@ namespace proj1
                 }   
             }
 
+            CaptureUdpResponse(pendingUdpPackets);
             
         }
 
-        private void CaptureUdpResponse() {
-            /*
+        private void CaptureUdpResponse(HashSet<(string ip, ushort port)> pendingUdpPackets) {
+            // Find the specified network interface
+            var devices = CaptureDeviceList.Instance;
+            ILiveDevice deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
+
+            if (deviceInterface == null)
+            {
+                Console.WriteLine($"Interface {NetworkInterface} not found.");
+                return;
+            }
+
+            deviceInterface.Open();
+            
+            
             // Set timeout
             DateTime startTime = DateTime.Now;
             TimeSpan timeout = TimeSpan.FromMilliseconds(Timeout);
@@ -486,6 +499,9 @@ namespace proj1
 
                 byte[] packetData = rawPacket.Data.ToArray();
 
+                ushort packetSrcPort = (ushort)((packetData[34] << 8) + packetData[35]);
+                string targetIp = new IPAddress(packetData.Skip(26).Take(4).ToArray()).ToString();
+
                 if (!MatchReplyPortIpAddresses(packetData))
                 {
                     continue;
@@ -497,28 +513,25 @@ namespace proj1
                     // Check if the packet is a UDP packet
                     if (packetData[23] == 0x11)
                     {
-                        // Extract the UDP header
-                        byte[] udpHeaderReceived = new byte[8];
-                        Array.Copy(packetData, 34, udpHeaderReceived, 0, 8);
-
-                        ushort packetSrcPort = (ushort)((packetData[34] << 8) + packetData[35]);
-                        string targetIp = new IPAddress(packetData.Skip(26).Take(4).ToArray()).ToString();
+                    
 
                         // Check if the packet is a port unreachable packet
                         if (packetData[42] == 0x03 && packetData[43] == 0x03) // Type 3, Code 3
                         {
                             // Port is closed
+                            pendingUdpPackets.Remove((targetIp, packetSrcPort));
                             Console.WriteLine("{0} {1} {2} {3}", targetIp, packetSrcPort, Protocol.udp, PortState.closed);
                         }
-                        else
-                        {
-                            // Port is open
-                            Console.WriteLine("{0} {1} {2} {3}", targetIp, packetSrcPort, Protocol.udp, PortState.open);
-                        }
+                        
                     }
                 }
             }
-            */
+
+            foreach((string ip, ushort port) in pendingUdpPackets)
+            {
+                Console.WriteLine("{0} {1} {2} {3}", ip, port, Protocol.udp, PortState.open);
+            }
+            deviceInterface.Close();
             
         }
 
@@ -563,6 +576,8 @@ namespace proj1
 
         private bool MatchReplyPortIpAddresses(byte[] packetData)
         {
+           
+            
             // Extract the source and destination IP addresses
             byte[] sourceIp = new byte[4];
             byte[] destIp = new byte[4];
@@ -576,16 +591,26 @@ namespace proj1
                     // Extract the source and destination ports
                     ushort replySrcPort = (ushort)((packetData[34] << 8) + packetData[35]);
                     ushort replyDestPort = (ushort)((packetData[36] << 8) + packetData[37]);
-
-                    // Check if the ports match
-                    if (TcpPorts.Contains(replySrcPort.ToString()) && replyDestPort == sourcePort)
-                    {
-                        return true;
+                    // Check if the packet is a TCP packet
+                    if (packetData[23] == 0x06) {
+                        // Check if the ports match
+                        if (TcpPorts.Contains(replySrcPort.ToString()) && replyDestPort == sourcePort)
+                        {
+                            return true;
+                        }
+                    }
+                    else if (packetData[23] == 0x11) {
+                        // Check if the ports match
+                        if (UdpPorts.Contains(replySrcPort.ToString()) && replyDestPort == sourcePort)
+                        {
+                            return true;
+                        }
                     }
                 }
             }
             return false;
         }
+            
 
 
         private bool MatchIcmpReplyPortIpAddresses(byte[] packetData, ushort destinationPort, ushort sourcePort, string targetIp)
