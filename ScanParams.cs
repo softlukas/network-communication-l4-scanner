@@ -343,20 +343,15 @@ namespace proj1
                     {
                         //Thread thread = new Thread(() => SendSynPacket(ushort.Parse(port), targetIp.IpAddress));
                         //thread.Start();
-                        SendSynPacket(ushort.Parse(port), targetIp.IpAddress);
                         pendingSynPackets.Add((targetIp.IpAddress, ushort.Parse(port)));
+                        SendSynPacket(ushort.Parse(port), targetIp.IpAddress);
+                        
                     }
             
                 }
             }
 
             CaptureResponseTcp(pendingSynPackets);
-
-            
-
-
-
-            
 
         }
 
@@ -456,17 +451,7 @@ namespace proj1
         
         public void ScanUdpPorts() {
 
-            // Find the specified network interface
-            var devices = CaptureDeviceList.Instance;
-            ILiveDevice deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
-
-            if (deviceInterface == null)
-            {
-                Console.WriteLine($"Interface {NetworkInterface} not found.");
-                return;
-            }
-
-            deviceInterface.Open();
+            HashSet<(string ip, ushort port)> pendingUdpPackets = new HashSet<(string, ushort)>();
 
             foreach (string port in UdpPorts)
             {
@@ -475,79 +460,17 @@ namespace proj1
                 {
                     if(targetIp.IpFormat == IpVersion.IPv4)
                     {
-                        SendUdpPacket(deviceInterface, destinationPort, targetIp.IpAddress);
+                        pendingUdpPackets.Add((targetIp.IpAddress, destinationPort));
+                        SendUdpPacket(destinationPort, targetIp.IpAddress);
                     }
                 }   
             }
+
+            
         }
 
-        private void SendUdpPacket(ILiveDevice deviceInterface, ushort destinationPort, string targetIp, bool resending = false)
-        {
+        private void CaptureUdpResponse() {
             /*
-            // Set destination port
-            byte[] destPortBytes = SetPortBytes(destinationPort);
-
-            
-            byte[] sourcePortBytes = SetPortBytes(this.sourcePort);
-
-            // Create IP header
-            byte[] ipHeader = new byte[20];
-            ipHeader[0] = 0x45; // Version and header length
-            ipHeader[1] = 0x00; // Type of service
-
-            ushort totalLength = (ushort)(20 + 8); // IP header (20 bytes) + UDP header (8 bytes)
-            ipHeader[2] = (byte)(totalLength >> 8); // High byte
-            ipHeader[3] = (byte)(totalLength & 0xFF); // Low byte
-
-            ipHeader[4] = 0x00; // Identification
-            ipHeader[5] = 0x00; // Identification
-            ipHeader[6] = 0x40; // Flags and fragment offset
-            ipHeader[7] = 0x00; // Fragment offset
-            ipHeader[8] = 0x40; // Time to live
-            ipHeader[9] = 0x11; // Protocol (UDP)
-            ipHeader[10] = 0x00; // Header checksum (to be filled later)
-            ipHeader[11] = 0x00; // Header checksum (to be filled later)
-
-            Array.Copy(SourceIp, 0, ipHeader, 12, 4); // Source IP
-            Array.Copy(IPAddress.Parse(targetIp).GetAddressBytes(), 0, ipHeader, 16, 4); // Destination IP
-
-            // Recalculate IP header checksum
-            ushort ipChecksum = CalculateChecksum(ipHeader);
-            ipHeader[10] = (byte)(ipChecksum >> 8);
-            ipHeader[11] = (byte)(ipChecksum & 0xFF);
-
-            // Create UDP header
-            byte[] udpHeader = new byte[8];
-            udpHeader[0] = sourcePortBytes[0]; // Source port high byte
-            udpHeader[1] = sourcePortBytes[1]; // Source port low byte
-            udpHeader[2] = destPortBytes[0]; // Destination port high byte
-            udpHeader[3] = destPortBytes[1]; // Destination port low byte
-
-            ushort udpLength = (ushort)(8); // UDP header length (8 bytes)
-            udpHeader[4] = (byte)(udpLength >> 8); // High byte
-            udpHeader[5] = (byte)(udpLength & 0xFF); // Low byte
-
-            // Checksum (optional for UDP, set to 0)
-            udpHeader[6] = 0x00;
-            udpHeader[7] = 0x00;
-
-            // Combine IP and UDP headers into a single packet
-            byte[] packet = new byte[ipHeader.Length + udpHeader.Length];
-            Array.Copy(ipHeader, 0, packet, 0, ipHeader.Length);
-            Array.Copy(udpHeader, 0, packet, ipHeader.Length, udpHeader.Length);
-
-            // Create a raw socket
-            Socket rawSocket = new Socket(AddressFamily.InterNetwork, SocketType.Raw, ProtocolType.Udp);
-            rawSocket.Bind(new IPEndPoint(new IPAddress(SourceIp), 0));
-            rawSocket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.HeaderIncluded, true);
-
-
-            // Send the packet
-            rawSocket.SendTo(packet, new IPEndPoint(IPAddress.Parse(targetIp), destinationPort));
-
-            // Close the UDP socket
-            rawSocket.Close();
-            
             // Set timeout
             DateTime startTime = DateTime.Now;
             TimeSpan timeout = TimeSpan.FromMilliseconds(Timeout);
@@ -563,32 +486,66 @@ namespace proj1
 
                 byte[] packetData = rawPacket.Data.ToArray();
 
-                
-                //if (!MatchIcmpReplyPortIpAddresses(packetData, destinationPort, this.sourcePort, targetIp))
-                //{
-                    //continue;
-                //}
-
-                if (packetData[23] == 0x01) // Protocol == ICMP
+                if (!MatchReplyPortIpAddresses(packetData))
                 {
-                    if (packetData[34] == 0x03 && packetData[35] == 0x03) // Type 3, Code 3
+                    continue;
+                }
+
+                // Check if the packet is an IP packet
+                if (packetData.Length >= 34 && packetData[12] == 0x08 && packetData[13] == 0x00)
+                {
+                    // Check if the packet is a UDP packet
+                    if (packetData[23] == 0x11)
                     {
-                        // Port is closed
-                        Console.WriteLine("{0} {1} {2} {3}", targetIp, destinationPort, Protocol.udp, PortState.closed);
-                        return;
+                        // Extract the UDP header
+                        byte[] udpHeaderReceived = new byte[8];
+                        Array.Copy(packetData, 34, udpHeaderReceived, 0, 8);
+
+                        ushort packetSrcPort = (ushort)((packetData[34] << 8) + packetData[35]);
+                        string targetIp = new IPAddress(packetData.Skip(26).Take(4).ToArray()).ToString();
+
+                        // Check if the packet is a port unreachable packet
+                        if (packetData[42] == 0x03 && packetData[43] == 0x03) // Type 3, Code 3
+                        {
+                            // Port is closed
+                            Console.WriteLine("{0} {1} {2} {3}", targetIp, packetSrcPort, Protocol.udp, PortState.closed);
+                        }
+                        else
+                        {
+                            // Port is open
+                            Console.WriteLine("{0} {1} {2} {3}", targetIp, packetSrcPort, Protocol.udp, PortState.open);
+                        }
                     }
                 }
-                
             }
-
-            // If no response within timeout, mark port as open|filtered
-            Console.WriteLine("{0} {1} {2} {3}", targetIp, destinationPort, Protocol.udp, PortState.open);
             */
+            
+        }
+
+        private void SendUdpPacket(ushort destinationPort, string targetIp, bool resending = false)
+        {
+            Packet packet = new Packet(destinationPort, 12345, SourceIp, targetIp, Packet.Protocol.Udp);
+            
+            byte[] udpPacket = packet.BuildPacket();
+
+            // Create a raw socket
+            Socket rawSocket = new Socket(AddressFamily.InterNetwork, SocketType.Raw, ProtocolType.Udp);
+            rawSocket.Bind(new IPEndPoint(new IPAddress(SourceIp), 0));
+            rawSocket.SetSocketOption(SocketOptionLevel.IP, SocketOptionName.HeaderIncluded, true);
+
+
+            // Send the packet
+            rawSocket.SendTo(udpPacket, new IPEndPoint(IPAddress.Parse(targetIp), destinationPort));
+
+            // Close the UDP socket
+            rawSocket.Close();
+            
+            
         }
                     
         private void SendSynPacket(ushort destinationPort, string targetIp) {
             
-            Packet packet = new Packet(destinationPort, 12345, SourceIp, targetIp);
+            Packet packet = new Packet(destinationPort, 12345, SourceIp, targetIp, Packet.Protocol.Tcp);
             byte[] tcpSynPacket = packet.BuildPacket();
 
             // Create a raw socket
@@ -602,24 +559,6 @@ namespace proj1
             // Close the raw socket
             rawSocket.Close();
 
-            
-
-        }
-
-        
-        private static ushort CalculateChecksum(byte[] data)
-        {
-            uint sum = 0;
-            for (int i = 0; i < data.Length; i += 2)
-            {
-                ushort word = (ushort)((data[i] << 8) + (i + 1 < data.Length ? data[i + 1] : 0));
-                sum += word;
-                if ((sum & 0xFFFF0000) != 0)
-                {
-                    sum = (sum & 0xFFFF) + (sum >> 16);
-                }
-            }
-            return (ushort)~sum;
         }
 
         private bool MatchReplyPortIpAddresses(byte[] packetData)
