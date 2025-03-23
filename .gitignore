@@ -1,6 +1,6 @@
 /bin
 /obj
-proj1.sln
+ipk-proj1.sln
 .vscode/
 TCPPacketSender.cs
 *.sh

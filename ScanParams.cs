@@ -7,8 +7,6 @@ using SharpPcap.LibPcap;
 using System.Threading;
 
 
-
-
 namespace proj1
 {
 
@@ -109,7 +107,7 @@ namespace proj1
             Target = target;
             Timeout = timeout;
 
-            SourceIp = NetworkManager.GetSourceIpAddress(networkInterface, IpAddressFormat);
+            SourceIp = NetworkManager.GetSourceIpAddress(networkInterface, IpVersion.IPv6);
             stringSourceIp = new IPAddress(SourceIp).ToString();
 
         }
@@ -136,13 +134,10 @@ namespace proj1
             //Thread captureThread = new Thread(CaptureResponseTcp);
             //captureThread.Start();
 
-            try {
-                ScanTcpPortsIpv6();
-            }    
-            catch (Exception e)
-            {
-                Console.WriteLine("Not support ipv6");
-            }
+            
+            ScanTcpPortsIpv6();
+              
+            
            
             
         }
@@ -176,27 +171,11 @@ namespace proj1
         }
 
         private void SendSynPacketIpv6(ILiveDevice deviceInterface, ushort destinationPort, string targetIp, bool resending = false) {
-            /*
+            
             // Set the destination port
             byte[] destPortBytes = SetPortBytes(destinationPort);
 
-            
-            byte[] sourcePortBytes = SetPortBytes(this.sourcePort);
-
-            // Create IPv6 header
-            byte[] ipv6Header = new byte[40];
-            ipv6Header[0] = 0x60; // Version and traffic class
-            // Traffic class and flow label are set to 0
-            ushort payloadLength = 20; // Payload length (TCP header only)
-            ipv6Header[4] = (byte)(payloadLength >> 8); // High byte
-            ipv6Header[5] = (byte)(payloadLength & 0xFF); // Low byte
-            ipv6Header[6] = 0x06; // Next header (TCP)
-            ipv6Header[7] = 64; // Hop limit
-
-            // Source IP (copy from `SourceIp`)
-            Array.Copy(SourceIp, 0, ipv6Header, 8, 16);
-            // Destination IP (copy from target IP)
-            Array.Copy(IPAddress.Parse(targetIp).GetAddressBytes(), 0, ipv6Header, 24, 16);
+            byte[] sourcePortBytes = SetPortBytes(sourcePort);
 
             // Create TCP header
             byte[] tcpHeader = new byte[20];
@@ -247,32 +226,16 @@ namespace proj1
             ushort tcpChecksum = CalculateChecksum(pseudoHeader);
             tcpHeader[16] = (byte)(tcpChecksum >> 8);
             tcpHeader[17] = (byte)(tcpChecksum & 0xFF);
-            try {
-                // Create a raw socket
-                Socket rawSocket = new Socket(AddressFamily.InterNetworkV6, SocketType.Raw, ProtocolType.Tcp);
-                rawSocket.Bind(new IPEndPoint(new IPAddress(SourceIp), 0));
 
-                // rawSocket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.HeaderIncluded, true);
+            // Create a raw socket
+            Socket rawSocket = new Socket(AddressFamily.InterNetworkV6, SocketType.Raw, ProtocolType.Tcp);
+            rawSocket.Bind(new IPEndPoint(new IPAddress(SourceIp), 0));
+            rawSocket.SendTo(tcpHeader, new IPEndPoint(IPAddress.Parse(targetIp), 0));
 
-                // rawSocket.SetSocketOption(SocketOptionLevel.IPv6, SocketOptionName.IPv6Only, false);
-
-                // Combine IPv6 and TCP headers into one packet
-                byte[] packet = new byte[ipv6Header.Length + tcpHeader.Length];
-                Array.Copy(ipv6Header, 0, packet, 0, ipv6Header.Length);
-                Array.Copy(tcpHeader, 0, packet, ipv6Header.Length, tcpHeader.Length);
-
-                // Send the packet
-
-                rawSocket.SendTo(packet, new IPEndPoint(IPAddress.Parse(targetIp), destinationPort));
-
-                // Close the raw socket
-                rawSocket.Close();
-            }
-            catch (SocketException e)
-            {
-                Console.WriteLine("Not support ipv6");
-                Environment.Exit(1);
-            }
+            // Close the raw socket
+            rawSocket.Close();
+            
+            
             
             // set timeout
             DateTime startTime = DateTime.Now;
@@ -289,10 +252,10 @@ namespace proj1
 
                 byte[] packetData = rawPacket.Data.ToArray();
 
-                if (!MatchReplyPortIpAddresses(packetData, destinationPort, this.sourcePort, targetIp))
-                {
-                    continue;
-                }
+                //if (!MatchReplyPortIpAddresses(packetData, destinationPort, sourcePort, targetIp))
+                //{
+                    //continue;
+                //}
 
                 // Check if the packet is an IPv6 packet
                 if (packetData.Length >= 54 && packetData[6] == 0x06)
@@ -329,7 +292,7 @@ namespace proj1
                 // port is filtered
                 Console.WriteLine("{0} {1} {2} {3}", targetIp, destinationPort, Protocol.tcp, PortState.filtered);
             }
-            */
+            
         }
         private void ScanTcpPortsIpv4() {
 
@@ -649,6 +612,21 @@ namespace proj1
                 Array.Reverse(portBytes);
             }
             return portBytes;
+        }
+
+        private static ushort CalculateChecksum(byte[] data)
+        {
+            uint sum = 0;
+            for (int i = 0; i < data.Length; i += 2)
+            {
+                ushort word = (ushort)((data[i] << 8) + (i + 1 < data.Length ? data[i + 1] : 0));
+                sum += word;
+                if ((sum & 0xFFFF0000) != 0)
+                {
+                    sum = (sum & 0xFFFF) + (sum >> 16);
+                }
+            }
+            return (ushort)~sum;
         }
 
     }
