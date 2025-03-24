@@ -253,10 +253,10 @@ namespace proj1
                 byte[] packetData = rawPacket.Data.ToArray();
                 
 
-                //if (!MatchReplyPortIpAddresses(packetData, destinationPort, sourcePort, targetIp))
-                //{
-                    //continue;
-                //}
+                if(!Ipv6MatchReplyPortAddress(packetData))
+                {
+                    continue;
+                }
 
                 // Check if the packet is an IPv6 packet
                 if (packetData.Length >= 54 && packetData[6] == 0x06)
@@ -595,6 +595,46 @@ namespace proj1
             }
             return false;
         }
+
+        private bool Ipv6MatchReplyPortAddress(byte[] packetData) 
+        {
+            // Extract the source and destination IP addresses for IPv6
+            byte[] sourceIp = new byte[16];
+            byte[] destIp = new byte[16];
+
+            // For IPv6, the source IP starts at byte 8 and destination at byte 24
+            Array.Copy(packetData, 8, sourceIp, 0, 16);
+            Array.Copy(packetData, 24, destIp, 0, 16);
+
+            // Check if the packet is from the target IP (IPv6)
+            if (_targetIpsList.Any(ip => ip.IpAddress == new IPAddress(sourceIp).ToString())) 
+            {
+                if (new IPAddress(destIp).ToString() == new IPAddress(SourceIp).ToString()) {
+                    // Extract the source and destination ports for IPv6
+                    ushort replySrcPort = (ushort)((packetData[40] << 8) + packetData[41]); // Adjusted for IPv6
+                    ushort replyDestPort = (ushort)((packetData[42] << 8) + packetData[43]); // Adjusted for IPv6
+
+                    // Check if the packet is a TCP packet (IPv6 header is 40 bytes long)
+                    if (packetData[6] == 0x06) {  // Protocol type for TCP in IPv6
+                        // Check if the ports match
+                        if (TcpPorts.Contains(replySrcPort.ToString()) && replyDestPort == sourcePort)
+                        {
+                            return true;
+                        }
+                    }
+                    // Check if the packet is a UDP packet (IPv6 header is 40 bytes long)
+                    else if (packetData[6] == 0x11) {  // Protocol type for UDP in IPv6
+                        // Check if the ports match
+                        if (UdpPorts.Contains(replySrcPort.ToString()) && replyDestPort == sourcePort)
+                        {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
             
 
 
