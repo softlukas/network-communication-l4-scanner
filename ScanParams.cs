@@ -251,6 +251,7 @@ namespace proj1
                 }
 
                 byte[] packetData = rawPacket.Data.ToArray();
+                
 
                 //if (!MatchReplyPortIpAddresses(packetData, destinationPort, sourcePort, targetIp))
                 //{
@@ -260,9 +261,30 @@ namespace proj1
                 // Check if the packet is an IPv6 packet
                 if (packetData.Length >= 54 && packetData[6] == 0x06)
                 {
+                    // Check if the packet is an IPv6 packet with a TCP header
+                    int nextHeader = packetData[6]; // IPv6 Next Header field
+                    int offset = 40; // IPv6 base header size
+
+                    // Skip any extension headers to find the TCP header
+                    while (nextHeader != 0x06) // 0x06 = TCP protocol
+                    {
+                        if (offset + 1 >= packetData.Length)
+                            break;
+                        
+                        nextHeader = packetData[offset]; // Next Header field
+                        offset += packetData[offset + 1] + 8; // Length of extension header
+                        
+                        if (offset >= packetData.Length)
+                            break;
+                    }
+
+                    // Ensure there is enough data for a TCP header
+                    if (packetData.Length < offset + 20)
+                        continue;
+                    
                     // Extract the TCP header
                     byte[] tcpHeaderReceived = new byte[20];
-                    Array.Copy(packetData, 54, tcpHeaderReceived, 0, 20);
+                    Array.Copy(packetData, offset, tcpHeaderReceived, 0, 20);
 
                     // Check if the packet is a SYN-ACK packet
                     if ((tcpHeaderReceived[13] & 0x12) == 0x12) // SYN and ACK flags set
