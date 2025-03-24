@@ -64,11 +64,11 @@ namespace proj1
             {
                 if (IPAddress.TryParse(value, out IPAddress ipAddress))
                 {
-
+                    IpAddressFormat = NetworkManager.IsIpv6Address(value) ? IpVersion.IPv6 : IpVersion.IPv4;
                     SingleIpAddress singleIpAddress = new SingleIpAddress
                     (
                         ipAddress: value,
-                        ipFormat: NetworkManager.IsIpv6Address(value) ? IpVersion.IPv6 : IpVersion.IPv4
+                        ipFormat: IpAddressFormat
                     );
                     _targetIpsList.Add(singleIpAddress);
                 }
@@ -107,7 +107,7 @@ namespace proj1
             Target = target;
             Timeout = timeout;
 
-            SourceIp = NetworkManager.GetSourceIpAddress(networkInterface, IpVersion.IPv6);
+            SourceIp = NetworkManager.GetSourceIpAddress(networkInterface, IpAddressFormat);
             stringSourceIp = new IPAddress(SourceIp).ToString();
 
         }
