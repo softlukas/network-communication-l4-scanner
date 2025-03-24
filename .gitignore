@@ -3,4 +3,8 @@
 ipk-proj1.sln
 .vscode/
 TCPPacketSender.cs
-*.sh
+diff_output.txt
+my_scan_output.txt
+my_scan_output_raw.txt
+nmap_output.txt
+original_nmap_output.txt
