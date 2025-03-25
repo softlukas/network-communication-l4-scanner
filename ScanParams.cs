@@ -261,14 +261,6 @@ namespace proj1
             {
                 PacketCapture rawPacket;
 
-                lock (_lock)
-                {
-                    if (deviceInterface.GetNextPacket(out rawPacket) != GetPacketStatus.PacketRead)
-                    {
-                        continue;
-                    }
-                }
-
                 // Read the next packet from the network deviceInterface
                 if (deviceInterface.GetNextPacket(out rawPacket) != GetPacketStatus.PacketRead)
                 {
