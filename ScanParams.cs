@@ -253,7 +253,7 @@ namespace proj1
                 byte[] packetData = rawPacket.Data.ToArray();
                 
 
-                if(!Ipv6MatchReplyPortAddress(packetData))
+                if(!Ipv6MatchReplyPortAddress(packetData, destinationPort))
                 {
                     continue;
                 }
@@ -596,7 +596,7 @@ namespace proj1
             return false;
         }
 
-        private bool Ipv6MatchReplyPortAddress(byte[] packetData) 
+        private bool Ipv6MatchReplyPortAddress(byte[] packetData, ushort testedPort) 
         {
             // Extract the source and destination IP addresses for IPv6
             byte[] sourceIp = new byte[16];
@@ -617,7 +617,7 @@ namespace proj1
                     // Check if the packet is a TCP packet (IPv6 header is 40 bytes long)
                     if (packetData[6] == 0x06) {  // Protocol type for TCP in IPv6
                         // Check if the ports match
-                        if (TcpPorts.Contains(replySrcPort.ToString()) && replyDestPort == sourcePort)
+                        if (replySrcPort == testedPort && replyDestPort == sourcePort)
                         {
                             return true;
                         }
