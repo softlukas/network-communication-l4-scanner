@@ -96,6 +96,8 @@ namespace proj1
         private string stringSourceIp;
         private string stringTargetIp;
         private const ushort sourcePort = 12345;
+
+        private static readonly object _lock = new object();
        
 
         public ScanParams(string? networkInterface, List<string> udpPorts, List<string> tcpPorts, 
@@ -143,9 +145,10 @@ namespace proj1
         }
         private void ScanTcpPortsIpv6() {
 
-            // Find the specified network interface
+            
+
             var devices = CaptureDeviceList.Instance;
-            ILiveDevice deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
+            var deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
 
             if (deviceInterface == null)
             {
@@ -155,8 +158,12 @@ namespace proj1
 
             deviceInterface.Open();
 
+
+            
+
             foreach (string port in TcpPorts)
             {
+
                 foreach(SingleIpAddress targetIp in _targetIpsList)
                 {
                     if(targetIp.IpFormat == IpVersion.IPv6)
@@ -166,11 +173,19 @@ namespace proj1
                 }
             }
 
+            
+
             deviceInterface.Close();
+
+            
 
         }
 
-        private void SendSynPacketIpv6(ILiveDevice deviceInterface, ushort destinationPort, string targetIp, bool resending = false) {
+        private void SendSynPacketIpv6(ICaptureDevice deviceInterface, ushort destinationPort, string targetIp, bool resending = false) {
+
+           
+
+           
             
             // Set the destination port
             byte[] destPortBytes = SetPortBytes(destinationPort);
@@ -237,6 +252,7 @@ namespace proj1
             
             
             
+            
             // set timeout
             DateTime startTime = DateTime.Now;
             TimeSpan timeout = TimeSpan.FromMilliseconds(Timeout);
@@ -244,6 +260,15 @@ namespace proj1
             while (DateTime.Now - startTime < timeout)
             {
                 PacketCapture rawPacket;
+
+                lock (_lock)
+                {
+                    if (deviceInterface.GetNextPacket(out rawPacket) != GetPacketStatus.PacketRead)
+                    {
+                        continue;
+                    }
+                }
+
                 // Read the next packet from the network deviceInterface
                 if (deviceInterface.GetNextPacket(out rawPacket) != GetPacketStatus.PacketRead)
                 {
@@ -303,6 +328,12 @@ namespace proj1
                     }
                 }
             }
+                
+                
+                
+                
+
+
             // if no response between timeout, send SYN packet again
             if (resending == false)
             {
@@ -314,6 +345,9 @@ namespace proj1
                 // port is filtered
                 Console.WriteLine("{0} {1} {2} {3}", targetIp, destinationPort, Protocol.tcp, PortState.filtered);
             }
+                    
+
+            
             
         }
         private void ScanTcpPortsIpv4() {
