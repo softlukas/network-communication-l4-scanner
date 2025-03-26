@@ -410,7 +410,16 @@ namespace proj1
         }
         private void ScanTcpPortsIpv4() {
 
-            HashSet<(string ip, ushort port)> pendingSynPackets = new HashSet<(string, ushort)>();
+            var devices = CaptureDeviceList.Instance;
+            var deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
+
+            if (deviceInterface == null)
+            {
+                Console.WriteLine($"Interface {NetworkInterface} not found.");
+                return;
+            }
+
+            deviceInterface.Open();
 
             foreach (string port in TcpPorts)
             {
@@ -418,22 +427,25 @@ namespace proj1
                 {
                     if(targetIp.IpFormat == IpVersion.IPv4)
                     {
-                        //Thread thread = new Thread(() => SendSynPacket(ushort.Parse(port), targetIp.IpAddress));
+                        //Thread thread = new Thread(() => SendSynPacketIpv4(ushort.Parse(port), targetIp.IpAddress));
                         //thread.Start();
-                        pendingSynPackets.Add((targetIp.IpAddress, ushort.Parse(port)));
-                        SendSynPacket(ushort.Parse(port), targetIp.IpAddress);
+                        
+                        SendSynPacketIpv4(deviceInterface, ushort.Parse(port), targetIp.IpAddress);
                         
                     }
             
                 }
             }
 
-            CaptureResponseTcp(pendingSynPackets);
+            deviceInterface.Close();
+
+
+           
 
         }
 
         private void CaptureResponseTcp(HashSet<(string ip, ushort port)> pendingSynPackets, bool resending=false) {
-            
+            /*
             // Find the specified network interface
             var devices = CaptureDeviceList.Instance;
             ILiveDevice deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
@@ -462,7 +474,7 @@ namespace proj1
 
                 byte[] packetData = rawPacket.Data.ToArray();
 
-                if(!MatchReplyPortIpAddresses(packetData))
+                if(!MatchReplyPortIpAddress(packetData))
                 {
                     continue;
                 }
@@ -509,9 +521,9 @@ namespace proj1
             {
                 if(resending == false)
                 {
-                    //Thread thread = new Thread(() => SendSynPacket(port, ip));
+                    //Thread thread = new Thread(() => SendSynPacketIpv4(port, ip));
                     //thread.Start();
-                    SendSynPacket(port, ip);   
+                    SendSynPacketIpv4(port, ip);   
                 }
                 else
                 {
@@ -521,7 +533,7 @@ namespace proj1
             if(resending == false) {
                 CaptureResponseTcp(pendingSynPackets, true);
             }
-            
+            */
             
         }
 
@@ -560,6 +572,7 @@ namespace proj1
 
         private void CaptureUdpResponse(HashSet<(string ip, ushort port)> pendingUdpPackets) 
         {
+            /*
             // Find the specified network interface
             var devices = CaptureDeviceList.Instance;
             ILiveDevice deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
@@ -591,7 +604,7 @@ namespace proj1
                 ushort packetSrcPort = (ushort)((packetData[34] << 8) + packetData[35]);
                 string targetIp = new IPAddress(packetData.Skip(26).Take(4).ToArray()).ToString();
 
-                if (!MatchReplyPortIpAddresses(packetData))
+                if (!MatchReplyPortIpAddress(packetData))
                 {
                     continue;
                 }
@@ -619,6 +632,7 @@ namespace proj1
                 Console.WriteLine("{0} {1} {2} {3}", ip, port, Protocol.udp, PortState.open);
             }
             deviceInterface.Close();
+            */
             
         }
 
@@ -643,7 +657,7 @@ namespace proj1
             
         }
                     
-        private void SendSynPacket(ushort destinationPort, string targetIp) {
+        private void SendSynPacketIpv4(ICaptureDevice deviceInterface, ushort destinationPort, string targetIp, bool resending=false) {
             
             Packet packet = new Packet(destinationPort, 12345, SourceIp, targetIp, Packet.Protocol.Tcp);
             byte[] tcpSynPacket = packet.BuildPacket();
@@ -655,13 +669,86 @@ namespace proj1
 
             // Send the packet
             rawSocket.SendTo(tcpSynPacket, new IPEndPoint(IPAddress.Parse(targetIp), destinationPort));
-
+           
             // Close the raw socket
             rawSocket.Close();
 
+            // set timeout
+            DateTime startTime = DateTime.Now;
+            TimeSpan timeout = TimeSpan.FromMilliseconds(Timeout);
+
+            while (DateTime.Now - startTime < timeout)
+            {
+
+                PacketCapture rawPacket;
+                // Read the next packet from the network deviceInterface
+                if (deviceInterface.GetNextPacket(out rawPacket) != GetPacketStatus.PacketRead)
+                {
+                    continue;
+                }
+
+                byte[] packetData = rawPacket.Data.ToArray();
+
+                if(!MatchReplyPortIpAddress(packetData, destinationPort))
+                {
+                    continue;
+                }
+                
+                // Check if the packet is an IP packet
+                if (packetData.Length >= 34 && packetData[12] == 0x08 && packetData[13] == 0x00)
+                {
+                    
+                    // Check if the packet is a TCP packet
+                    if (packetData[23] == 0x06)
+                    {
+                        
+                        // Extract the TCP header
+                        byte[] tcpHeaderReceived = new byte[20];
+                        Array.Copy(packetData, 34, tcpHeaderReceived, 0, 20);
+                    
+                        ushort packetSrcPort = (ushort)((packetData[34] << 8) + packetData[35]);
+                        //string targetIp = new IPAddress(packetData.Skip(26).Take(4).ToArray()).ToString();
+
+                        // Check if the packet is a SYN-ACK packet
+                        if ((tcpHeaderReceived[13] & 0x12) == 0x12) // SYN and ACK flags set
+                        {
+                            // port is open
+                            Console.WriteLine("{0} {1} {2} {3}", targetIp, packetSrcPort, Protocol.tcp, PortState.open);
+                            return;
+                        }
+
+                        // Check if the packet is a RST packet
+                        if ((tcpHeaderReceived[13] & 0x04) == 0x04) // RST flag set
+                        {
+                            // port is closed
+                            Console.WriteLine("{0} {1} {2} {3}", targetIp, packetSrcPort, Protocol.tcp, PortState.closed);
+                            return;
+                            
+                        }
+
+                        
+                    }
+                }
+            }
+            
+            
+            // if no response between timeout, send SYN packet again
+            if (resending == false)
+            {
+                SendSynPacketIpv4(deviceInterface, destinationPort, targetIp, true);
+            }
+            // mark port as filtered after resending
+            if (resending == true)  
+            {
+                // port is filtered
+                Console.WriteLine("{0} {1} {2} {3}", targetIp, destinationPort, Protocol.tcp, PortState.filtered);
+            }
+
+
+
         }
 
-        private bool MatchReplyPortIpAddresses(byte[] packetData)
+        private bool MatchReplyPortIpAddress(byte[] packetData, ushort testedPort)
         {
            
             
@@ -681,11 +768,12 @@ namespace proj1
                     // Check if the packet is a TCP packet
                     if (packetData[23] == 0x06) {
                         // Check if the ports match
-                        if (TcpPorts.Contains(replySrcPort.ToString()) && replyDestPort == sourcePort)
+                        if (replySrcPort == testedPort && replyDestPort == sourcePort)
                         {
                             return true;
                         }
                     }
+                    // Check if the packet is a UDP packet
                     else if (packetData[23] == 0x11) {
                         // Check if the ports match
                         if (UdpPorts.Contains(replySrcPort.ToString()) && replyDestPort == sourcePort)
