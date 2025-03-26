@@ -444,98 +444,7 @@ namespace proj1
 
         }
 
-        private void CaptureResponseTcp(HashSet<(string ip, ushort port)> pendingSynPackets, bool resending=false) {
-            /*
-            // Find the specified network interface
-            var devices = CaptureDeviceList.Instance;
-            ILiveDevice deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
-
-            if (deviceInterface == null)
-            {
-                Console.WriteLine($"Interface {NetworkInterface} not found.");
-                return;
-            }
-
-            deviceInterface.Open();
-
-            // set timeout
-            DateTime startTime = DateTime.Now;
-            TimeSpan timeout = TimeSpan.FromMilliseconds(Timeout);
-
-            while (DateTime.Now - startTime < timeout)
-            {
-
-                PacketCapture rawPacket;
-                // Read the next packet from the network deviceInterface
-                if (deviceInterface.GetNextPacket(out rawPacket) != GetPacketStatus.PacketRead)
-                {
-                    continue;
-                }
-
-                byte[] packetData = rawPacket.Data.ToArray();
-
-                if(!MatchReplyPortIpAddress(packetData))
-                {
-                    continue;
-                }
-                
-                // Check if the packet is an IP packet
-                if (packetData.Length >= 34 && packetData[12] == 0x08 && packetData[13] == 0x00)
-                {
-                    
-                    // Check if the packet is a TCP packet
-                    if (packetData[23] == 0x06)
-                    {
-                        
-                        // Extract the TCP header
-                        byte[] tcpHeaderReceived = new byte[20];
-                        Array.Copy(packetData, 34, tcpHeaderReceived, 0, 20);
-                    
-                        ushort packetSrcPort = (ushort)((packetData[34] << 8) + packetData[35]);
-                        string targetIp = new IPAddress(packetData.Skip(26).Take(4).ToArray()).ToString();
-
-                        // Check if the packet is a SYN-ACK packet
-                        if ((tcpHeaderReceived[13] & 0x12) == 0x12) // SYN and ACK flags set
-                        {
-                            // port is open
-                            Console.WriteLine("{0} {1} {2} {3}", targetIp, packetSrcPort, Protocol.tcp, PortState.open);
-                            pendingSynPackets.Remove((targetIp, packetSrcPort));
-                        }
-
-                        // Check if the packet is a RST packet
-                        if ((tcpHeaderReceived[13] & 0x04) == 0x04) // RST flag set
-                        {
-                            // port is closed
-                            Console.WriteLine("{0} {1} {2} {3}", targetIp, packetSrcPort, Protocol.tcp, PortState.closed);
-                            pendingSynPackets.Remove((targetIp, packetSrcPort));
-                        }
-
-                        
-                    }
-                }
-            }
-            
-            deviceInterface.Close();
-            
-            foreach((string ip, ushort port) in pendingSynPackets)
-            {
-                if(resending == false)
-                {
-                    //Thread thread = new Thread(() => SendSynPacketIpv4(port, ip));
-                    //thread.Start();
-                    SendSynPacketIpv4(port, ip);   
-                }
-                else
-                {
-                    Console.WriteLine("{0} {1} {2} {3}", ip, port, Protocol.tcp, PortState.filtered);
-                }
-            }
-            if(resending == false) {
-                CaptureResponseTcp(pendingSynPackets, true);
-            }
-            */
-            
-        }
+        
 
         
         public void ScanUdpPorts() {
@@ -557,7 +466,7 @@ namespace proj1
                 {
                     if(targetIp.IpFormat == IpVersion.IPv4)
                     {
-                        SendUdpPacket(ushort.Parse(port), targetIp.IpAddress);
+                        SendUdpPacketIpv4(deviceInterface, ushort.Parse(port), targetIp.IpAddress);
                     }
                     if(targetIp.IpFormat == IpVersion.IPv6)
                     {
@@ -570,74 +479,13 @@ namespace proj1
             
         }
 
-        private void CaptureUdpResponse(HashSet<(string ip, ushort port)> pendingUdpPackets) 
+        
+
+        private void SendUdpPacketIpv4(ICaptureDevice deviceInterface, ushort destinationPort, string targetIp, bool resending = false)
         {
-            /*
-            // Find the specified network interface
-            var devices = CaptureDeviceList.Instance;
-            ILiveDevice deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
+            const ushort destUnreacheable = 3;
+            const ushort portUnreachableCode = 3;
 
-            if (deviceInterface == null)
-            {
-                Console.WriteLine($"Interface {NetworkInterface} not found.");
-                return;
-            }
-
-            deviceInterface.Open();
-            
-            
-            // Set timeout
-            DateTime startTime = DateTime.Now;
-            TimeSpan timeout = TimeSpan.FromMilliseconds(Timeout);
-
-            while (DateTime.Now - startTime < timeout)
-            {
-                PacketCapture rawPacket;
-                // Read the next packet from the network deviceInterface
-                if (deviceInterface.GetNextPacket(out rawPacket) != GetPacketStatus.PacketRead)
-                {
-                    continue;
-                }
-
-                byte[] packetData = rawPacket.Data.ToArray();
-
-                ushort packetSrcPort = (ushort)((packetData[34] << 8) + packetData[35]);
-                string targetIp = new IPAddress(packetData.Skip(26).Take(4).ToArray()).ToString();
-
-                if (!MatchReplyPortIpAddress(packetData))
-                {
-                    continue;
-                }
-
-                
-                    // Check if the packet is a UDP packet
-                    if (packetData.Length >= 48 && packetData[40] == 0x01 && packetData[41] == 0x04)
-                    {
-                    
-
-                        // Check if the packet is a port unreachable packet
-                        if (packetData[42] == 0x03 && packetData[43] == 0x03) // Type 3, Code 3
-                        {
-                            // Port is closed
-                            pendingUdpPackets.Remove((targetIp, packetSrcPort));
-                            Console.WriteLine("{0} {1} {2} {3}", targetIp, packetSrcPort, Protocol.udp, PortState.closed);
-                        }
-                        
-                    }
-                
-            }
-
-            foreach((string ip, ushort port) in pendingUdpPackets)
-            {
-                Console.WriteLine("{0} {1} {2} {3}", ip, port, Protocol.udp, PortState.open);
-            }
-            deviceInterface.Close();
-            */
-            
-        }
-
-        private void SendUdpPacket(ushort destinationPort, string targetIp, bool resending = false)
-        {
             Packet packet = new Packet(destinationPort, 12345, SourceIp, targetIp, Packet.Protocol.Udp);
             
             byte[] udpPacket = packet.BuildPacket();
@@ -653,6 +501,38 @@ namespace proj1
 
             // Close the UDP socket
             rawSocket.Close();
+
+            // Set timeout
+            DateTime startTime = DateTime.Now;
+            TimeSpan timeout = TimeSpan.FromMilliseconds(Timeout);
+
+            while (DateTime.Now - startTime < timeout) {
+
+                PacketCapture rawPacket;
+
+                // Read the next packet from the network device
+                if (deviceInterface.GetNextPacket(out rawPacket) != GetPacketStatus.PacketRead) {
+                    continue;
+                }
+
+                byte[] packetData = rawPacket.Data.ToArray();
+
+                if(!MatchReplyPortIpAddress(packetData, destinationPort, Protocol.udp)) {
+                    continue;
+                }
+                
+                // Check if the packet is an ICMPv6 message (Type 3, Code 3 = Port Unreachable)
+                if (packetData.Length >= 48 && packetData[34] == destUnreacheable && packetData[35] == portUnreachableCode) {
+                    // Port is closed
+                    Console.WriteLine("{0} {1} {2} {3}", targetIp, destinationPort, Protocol.udp, PortState.closed);
+                    return;
+                }
+            }
+
+            // If no ICMP error response was received, assume the port is open
+            Console.WriteLine("{0} {1} {2} {3}", targetIp, destinationPort, Protocol.udp, PortState.open);
+
+
             
             
         }
@@ -689,7 +569,7 @@ namespace proj1
 
                 byte[] packetData = rawPacket.Data.ToArray();
 
-                if(!MatchReplyPortIpAddress(packetData, destinationPort))
+                if(!MatchReplyPortIpAddress(packetData, destinationPort, Protocol.tcp))
                 {
                     continue;
                 }
@@ -748,7 +628,7 @@ namespace proj1
 
         }
 
-        private bool MatchReplyPortIpAddress(byte[] packetData, ushort testedPort)
+        private bool MatchReplyPortIpAddress(byte[] packetData, ushort testedPort, Protocol protocol)
         {
            
             
@@ -761,10 +641,29 @@ namespace proj1
             // Check if the packet is from the target IP
             if (_targetIpsList.Any(ip => ip.IpAddress == new IPAddress(sourceIp).ToString())) 
             {
+                
                 if (new IPAddress(destIp).ToString() == new IPAddress(SourceIp).ToString()) {
+                    
+
                     // Extract the source and destination ports
-                    ushort replySrcPort = (ushort)((packetData[34] << 8) + packetData[35]);
-                    ushort replyDestPort = (ushort)((packetData[36] << 8) + packetData[37]);
+                    ushort replySrcPort = 0;    
+                    ushort replyDestPort = 0;   
+
+                    if(protocol == Protocol.tcp) {
+                        replySrcPort = (ushort)((packetData[34] << 8) + packetData[35]);
+                        replyDestPort = (ushort)((packetData[36] << 8) + packetData[37]);
+                    }
+
+                    if(protocol == Protocol.udp) {
+                        replySrcPort = (ushort)((packetData[64] << 8) + packetData[65]);
+                        replyDestPort = (ushort)((packetData[62] << 8) + packetData[63]);
+                    }
+                    
+
+                    
+
+
+
                     // Check if the packet is a TCP packet
                     if (packetData[23] == 0x06) {
                         // Check if the ports match
@@ -774,13 +673,15 @@ namespace proj1
                         }
                     }
                     // Check if the packet is a UDP packet
-                    else if (packetData[23] == 0x11) {
-                        // Check if the ports match
-                        if (UdpPorts.Contains(replySrcPort.ToString()) && replyDestPort == sourcePort)
-                        {
-                            return true;
-                        }
+                    //else if (packetData[23] == 0x11) {
+                    
+                    // Check if the ports match
+                    if (replySrcPort == testedPort && replyDestPort == sourcePort)
+                    {
+                        
+                        return true;
                     }
+                    
                 }
             }
             return false;
@@ -836,14 +737,16 @@ namespace proj1
             // For IPv6, the source IP starts at byte 8 and destination at byte 24
             Array.Copy(packetData, 8, sourceIp, 0, 16);
             Array.Copy(packetData, 24, destIp, 0, 16);
-
+            Console.WriteLine("Dostal som sa sem");
             // Check if the packet is from the target IP (IPv6)
             if (_targetIpsList.Any(ip => ip.IpAddress == new IPAddress(sourceIp).ToString())) 
             {
                 
                 if (new IPAddress(destIp).ToString() == new IPAddress(SourceIp).ToString()) {
                     /// Extract the source and destination ports from the original UDP header inside ICMPv6
-                    /// 
+                    ///
+
+                    
                     ushort replySrcPort = (ushort)((packetData[90] << 8) + packetData[91]); // Correct offset for IPv6
                     ushort replyDestPort = (ushort)((packetData[88] << 8) + packetData[89]); // Correct offset for IPv6
                     
@@ -853,35 +756,6 @@ namespace proj1
                     }
                 }
             }
-            return false;
-        }
-
-        private bool MatchIcmpReplyPortIpAddresses(byte[] packetData, ushort destinationPort, ushort sourcePort, string targetIp)
-        {
-            // Extract outer IP addresses (who sent ICMP)
-            byte[] icmpSourceIp = new byte[4];
-            byte[] icmpDestIp = new byte[4];
-            Array.Copy(packetData, 26, icmpSourceIp, 0, 4);
-            Array.Copy(packetData, 30, icmpDestIp, 0, 4);
-
-            // Check if ICMP came from target IP (target IP sent us "port unreachable")
-            if (new IPAddress(icmpSourceIp).ToString() == targetIp)
-            {
-                // Now, get to the "embedded" original IP header (inside ICMP)
-                int embeddedIpHeaderStart = 34; // 14 (Ethernet) + 20 (IP)
-                int embeddedUdpHeaderStart = embeddedIpHeaderStart + 20; // IP header is 20 bytes
-
-                // Extract source and destination ports from embedded UDP header
-                ushort embeddedSrcPort = (ushort)((packetData[embeddedUdpHeaderStart] << 8) + packetData[embeddedUdpHeaderStart + 1]);
-                ushort embeddedDestPort = (ushort)((packetData[embeddedUdpHeaderStart + 2] << 8) + packetData[embeddedUdpHeaderStart + 3]);
-
-                // Match ports (original packet's ports)
-                if (embeddedSrcPort == sourcePort && embeddedDestPort == destinationPort)
-                {
-                    return true;
-                }
-            }
-
             return false;
         }
 
