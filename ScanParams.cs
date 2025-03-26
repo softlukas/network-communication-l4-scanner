@@ -174,21 +174,6 @@ namespace proj1
             }
 
 
-            foreach (string port in UdpPorts)
-            {
-
-                foreach(SingleIpAddress targetIp in _targetIpsList)
-                {
-                    if(targetIp.IpFormat == IpVersion.IPv6)
-                    {
-                        SendUdpPacketIpv6(deviceInterface, ushort.Parse(port), targetIp.IpAddress);
-                    }
-                }
-            }
-
-
-            
-
             deviceInterface.Close();
 
             
@@ -358,6 +343,9 @@ namespace proj1
             byte[] destPortBytes = SetPortBytes(destinationPort);
             byte[] sourcePortBytes = SetPortBytes(sourcePort);
 
+            const ushort destUnreacheable = 1;
+            const ushort portUnreachableCode = 4;
+
             // Create UDP header
             byte[] udpHeader = new byte[8];
             udpHeader[0] = sourcePortBytes[0]; // Source port high byte
@@ -387,7 +375,7 @@ namespace proj1
             rawSocket.SendTo(udpHeader, new IPEndPoint(IPAddress.Parse(targetIp), 0));
             rawSocket.Close();
 
-            Console.WriteLine("Packet send");
+            
 
             // Set timeout
             DateTime startTime = DateTime.Now;
@@ -408,9 +396,9 @@ namespace proj1
                     continue;
                 }
 
-                Console.WriteLine("Dostal som sa sem");
+                
                 // Check if the packet is an ICMPv6 message (Type 3, Code 3 = Port Unreachable)
-                if (packetData.Length >= 48 && packetData[40] == 0x03 && packetData[41] == 0x03) {
+                if (packetData.Length >= 48 && packetData[40] == destUnreacheable && packetData[41] == portUnreachableCode) {
                     // Port is closed
                     Console.WriteLine("{0} {1} {2} {3}", targetIp, destinationPort, Protocol.udp, PortState.closed);
                     return;
@@ -539,23 +527,34 @@ namespace proj1
 
         
         public void ScanUdpPorts() {
+            
+            var devices = CaptureDeviceList.Instance;
+            var deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
 
-            HashSet<(string ip, ushort port)> pendingUdpPackets = new HashSet<(string, ushort)>();
+            if (deviceInterface == null)
+            {
+                Console.WriteLine($"Interface {NetworkInterface} not found.");
+                return;
+            }
+
+            deviceInterface.Open();
 
             foreach (string port in UdpPorts)
             {
-                ushort destinationPort = ushort.Parse(port);
                 foreach(SingleIpAddress targetIp in _targetIpsList)
                 {
                     if(targetIp.IpFormat == IpVersion.IPv4)
                     {
-                        pendingUdpPackets.Add((targetIp.IpAddress, destinationPort));
-                        SendUdpPacket(destinationPort, targetIp.IpAddress);
+                        SendUdpPacket(ushort.Parse(port), targetIp.IpAddress);
+                    }
+                    if(targetIp.IpFormat == IpVersion.IPv6)
+                    {
+                        SendUdpPacketIpv6(deviceInterface, ushort.Parse(port), targetIp.IpAddress);
                     }
                 }   
             }
 
-            CaptureUdpResponse(pendingUdpPackets);
+            deviceInterface.Close();
             
         }
 
@@ -753,30 +752,17 @@ namespace proj1
             // Check if the packet is from the target IP (IPv6)
             if (_targetIpsList.Any(ip => ip.IpAddress == new IPAddress(sourceIp).ToString())) 
             {
-                Console.WriteLine(1);
+                
                 if (new IPAddress(destIp).ToString() == new IPAddress(SourceIp).ToString()) {
-                    Console.WriteLine(2);
                     /// Extract the source and destination ports from the original UDP header inside ICMPv6
                     /// 
-                    ushort replySrcPort = (ushort)((packetData[56] << 8) + packetData[57]); // Correct offset for IPv6
-                    ushort replyDestPort = (ushort)((packetData[58] << 8) + packetData[59]); // Correct offset for IPv6
-
-                    // Check if the packet is an ICMPv6 message (Type 3, Code 3 = Port Unreachable)
-                    //if (packetData.Length >= 48 && packetData[40] == 0x03 && packetData[41] == 0x03)
+                    ushort replySrcPort = (ushort)((packetData[90] << 8) + packetData[91]); // Correct offset for IPv6
+                    ushort replyDestPort = (ushort)((packetData[88] << 8) + packetData[89]); // Correct offset for IPv6
                     
+                    if (replySrcPort == testedPort && replyDestPort == sourcePort)
                     {
-                        Console.WriteLine(3);
-                        // Check if the ports match
-                        Console.WriteLine(replySrcPort);
-                        Console.WriteLine(testedPort);
-                        if (replySrcPort == testedPort && replyDestPort == sourcePort)
-                        {
-                            return true;
-                        }
+                        return true;
                     }
-                    
-                        
-                    
                 }
             }
             return false;
