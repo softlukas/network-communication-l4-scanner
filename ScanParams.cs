@@ -173,6 +173,20 @@ namespace proj1
                 }
             }
 
+
+            foreach (string port in UdpPorts)
+            {
+
+                foreach(SingleIpAddress targetIp in _targetIpsList)
+                {
+                    if(targetIp.IpFormat == IpVersion.IPv6)
+                    {
+                        SendUdpPacketIpv6(deviceInterface, ushort.Parse(port), targetIp.IpAddress);
+                    }
+                }
+            }
+
+
             
 
             deviceInterface.Close();
@@ -181,12 +195,8 @@ namespace proj1
 
         }
 
-        private void SendSynPacketIpv6(ICaptureDevice deviceInterface, ushort destinationPort, string targetIp, bool resending = false) {
-
-           
-
-           
-            
+        private void SendSynPacketIpv6(ICaptureDevice deviceInterface, ushort destinationPort, string targetIp, bool resending = false) 
+        {
             // Set the destination port
             byte[] destPortBytes = SetPortBytes(destinationPort);
 
@@ -337,10 +347,78 @@ namespace proj1
                 // port is filtered
                 Console.WriteLine("{0} {1} {2} {3}", targetIp, destinationPort, Protocol.tcp, PortState.filtered);
             }
-                    
+                        
 
+                
+                
+        }
+
+        private void SendUdpPacketIpv6(ICaptureDevice deviceInterface, ushort destinationPort, string targetIp, bool resending = false) {
+            // Set the destination port
+            byte[] destPortBytes = SetPortBytes(destinationPort);
+            byte[] sourcePortBytes = SetPortBytes(sourcePort);
+
+            // Create UDP header
+            byte[] udpHeader = new byte[8];
+            udpHeader[0] = sourcePortBytes[0]; // Source port high byte
+            udpHeader[1] = sourcePortBytes[1]; // Source port low byte
+            udpHeader[2] = destPortBytes[0];   // Destination port high byte
+            udpHeader[3] = destPortBytes[1];   // Destination port low byte
+            udpHeader[4] = 0x00; // Length high byte (placeholder)
+            udpHeader[5] = 0x08; // Length low byte (8 bytes UDP header)
+            // Calculate UDP checksum
+            byte[] pseudoHeader = new byte[40 + udpHeader.Length];
+            Array.Copy(SourceIp, 0, pseudoHeader, 0, 16); // Source IP
+            Array.Copy(IPAddress.Parse(targetIp).GetAddressBytes(), 0, pseudoHeader, 16, 16); // Destination IP
+            pseudoHeader[32] = 0x00; // Reserved
+            pseudoHeader[33] = 0x11; // Protocol (UDP)
+            pseudoHeader[34] = 0x00; // UDP length high byte
+            pseudoHeader[35] = 0x08; // UDP length low byte
+            Array.Copy(udpHeader, 0, pseudoHeader, 36, udpHeader.Length);
+
+            ushort udpChecksum = CalculateChecksum(pseudoHeader);
+            udpHeader[6] = (byte)(udpChecksum >> 8);
+            udpHeader[7] = (byte)(udpChecksum & 0xFF);
             
-            
+
+            // Create raw socket
+            Socket rawSocket = new Socket(AddressFamily.InterNetworkV6, SocketType.Raw, ProtocolType.Udp);
+            rawSocket.Bind(new IPEndPoint(new IPAddress(SourceIp), 0));
+            rawSocket.SendTo(udpHeader, new IPEndPoint(IPAddress.Parse(targetIp), 0));
+            rawSocket.Close();
+
+            Console.WriteLine("Packet send");
+
+            // Set timeout
+            DateTime startTime = DateTime.Now;
+            TimeSpan timeout = TimeSpan.FromMilliseconds(Timeout);
+
+            while (DateTime.Now - startTime < timeout) {
+
+                PacketCapture rawPacket;
+
+                // Read the next packet from the network device
+                if (deviceInterface.GetNextPacket(out rawPacket) != GetPacketStatus.PacketRead) {
+                    continue;
+                }
+
+                byte[] packetData = rawPacket.Data.ToArray();
+
+                if (!Ipv6MatchReplyPortAddressUdp(packetData, destinationPort)) {
+                    continue;
+                }
+
+                Console.WriteLine("Dostal som sa sem");
+                // Check if the packet is an ICMPv6 message (Type 3, Code 3 = Port Unreachable)
+                if (packetData.Length >= 48 && packetData[40] == 0x03 && packetData[41] == 0x03) {
+                    // Port is closed
+                    Console.WriteLine("{0} {1} {2} {3}", targetIp, destinationPort, Protocol.udp, PortState.closed);
+                    return;
+                }
+            }
+
+            // If no ICMP error response was received, assume the port is open
+            Console.WriteLine("{0} {1} {2} {3}", targetIp, destinationPort, Protocol.udp, PortState.open);
         }
         private void ScanTcpPortsIpv4() {
 
@@ -481,7 +559,8 @@ namespace proj1
             
         }
 
-        private void CaptureUdpResponse(HashSet<(string ip, ushort port)> pendingUdpPackets) {
+        private void CaptureUdpResponse(HashSet<(string ip, ushort port)> pendingUdpPackets) 
+        {
             // Find the specified network interface
             var devices = CaptureDeviceList.Instance;
             ILiveDevice deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
@@ -518,11 +597,9 @@ namespace proj1
                     continue;
                 }
 
-                // Check if the packet is an IP packet
-                if (packetData.Length >= 34 && packetData[12] == 0x08 && packetData[13] == 0x00)
-                {
+                
                     // Check if the packet is a UDP packet
-                    if (packetData[23] == 0x11)
+                    if (packetData.Length >= 48 && packetData[40] == 0x01 && packetData[41] == 0x04)
                     {
                     
 
@@ -535,7 +612,7 @@ namespace proj1
                         }
                         
                     }
-                }
+                
             }
 
             foreach((string ip, ushort port) in pendingUdpPackets)
@@ -624,6 +701,7 @@ namespace proj1
 
         private bool Ipv6MatchReplyPortAddress(byte[] packetData, ushort testedPort) 
         {
+            
             // Extract the source and destination IP addresses for IPv6
             byte[] sourceIp = new byte[16];
             byte[] destIp = new byte[16];
@@ -651,7 +729,7 @@ namespace proj1
                     // Check if the packet is a UDP packet (IPv6 header is 40 bytes long)
                     else if (packetData[6] == 0x11) {  // Protocol type for UDP in IPv6
                         // Check if the ports match
-                        if (UdpPorts.Contains(replySrcPort.ToString()) && replyDestPort == sourcePort)
+                        if (replySrcPort == testedPort && replyDestPort == sourcePort)
                         {
                             return true;
                         }
@@ -662,7 +740,47 @@ namespace proj1
         }
 
             
+        private bool Ipv6MatchReplyPortAddressUdp(byte[] packetData, ushort testedPort) 
+        {
+            // Extract the source and destination IP addresses for IPv6
+            byte[] sourceIp = new byte[16];
+            byte[] destIp = new byte[16];
 
+            // For IPv6, the source IP starts at byte 8 and destination at byte 24
+            Array.Copy(packetData, 8, sourceIp, 0, 16);
+            Array.Copy(packetData, 24, destIp, 0, 16);
+
+            // Check if the packet is from the target IP (IPv6)
+            if (_targetIpsList.Any(ip => ip.IpAddress == new IPAddress(sourceIp).ToString())) 
+            {
+                Console.WriteLine(1);
+                if (new IPAddress(destIp).ToString() == new IPAddress(SourceIp).ToString()) {
+                    Console.WriteLine(2);
+                    /// Extract the source and destination ports from the original UDP header inside ICMPv6
+                    /// 
+                    ushort replySrcPort = (ushort)((packetData[56] << 8) + packetData[57]); // Correct offset for IPv6
+                    ushort replyDestPort = (ushort)((packetData[58] << 8) + packetData[59]); // Correct offset for IPv6
+
+                    // Check if the packet is an ICMPv6 message (Type 3, Code 3 = Port Unreachable)
+                    //if (packetData.Length >= 48 && packetData[40] == 0x03 && packetData[41] == 0x03)
+                    
+                    {
+                        Console.WriteLine(3);
+                        // Check if the ports match
+                        Console.WriteLine(replySrcPort);
+                        Console.WriteLine(testedPort);
+                        if (replySrcPort == testedPort && replyDestPort == sourcePort)
+                        {
+                            return true;
+                        }
+                    }
+                    
+                        
+                    
+                }
+            }
+            return false;
+        }
 
         private bool MatchIcmpReplyPortIpAddresses(byte[] packetData, ushort destinationPort, ushort sourcePort, string targetIp)
         {
