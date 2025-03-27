@@ -1,4 +1,4 @@
-# Problémy s IPv6
+## Problémy s IPv6
 
 Nakoľko kolejnet nepodporuje IPv6, bolo toto treba obísť rôznymi spôsobmi, či už FIT VPN, alebo ak váš mobilný operátor IPv6 poskytuje, mohli ste si urobiť hotspot. Na FIT VPN a teda cez rozhranie `tun0` mi IPv6 scan fungoval, avšak u kamaráta práve cez mobilné dáta, kde on mal konektivitu dostupnú na `enp0s3`, už nie.
 
