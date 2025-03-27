@@ -4,3 +4,5 @@ ipk-proj1.sln
 .vscode/
 TCPPacketSender.cs
 *.txt
+ipk-l4-scan
+ipk-l4-scan.pdb

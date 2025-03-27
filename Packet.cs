@@ -17,6 +17,7 @@ namespace proj1 {
 
         private Protocol protocol;
 
+        // packet constructor
         public Packet(ushort destPort, ushort srcPort, byte[] sourceIp, string targetIp, Protocol protocol) {
             DestPort = destPort;
             SrcPort = srcPort;
@@ -28,9 +29,9 @@ namespace proj1 {
         public byte[] BuildPacket() {
 
             // set destination port
-            byte[] destPortBytes = SetPortBytes(DestPort);
+            byte[] destPortBytes = NetworkManager.SetPortBytes(DestPort);
 
-            byte[] SrcPortBytes = SetPortBytes(SrcPort);
+            byte[] SrcPortBytes = NetworkManager.SetPortBytes(SrcPort);
             
             // Create IP header
             byte[] ipHeader = new byte[20];
@@ -57,7 +58,7 @@ namespace proj1 {
             Array.Copy(IPAddress.Parse(TargetIp).GetAddressBytes(), 0, ipHeader, 16, 4); 
 
             // Recalculate IP header checksum
-            ushort ipChecksum = CalculateChecksum(ipHeader);
+            ushort ipChecksum = NetworkManager.CalculateChecksum(ipHeader);
             ipHeader[10] = (byte)(ipChecksum >> 8);
             ipHeader[11] = (byte)(ipChecksum & 0xFF);
             
@@ -74,15 +75,12 @@ namespace proj1 {
                 Array.Copy(IPAddress.Parse(TargetIp).GetAddressBytes(), 0, pseudoHeader, 4, 4); 
                 pseudoHeader[8] = 0x00; // Reserved
                 pseudoHeader[9] = (byte)protocol; // Protocol (TCP)
-
-
                 pseudoHeader[10] = (byte)(tcpUdpHeader.Length >> 8);
                 pseudoHeader[11] = (byte)(tcpUdpHeader.Length & 0xFF);
 
                 Array.Copy(tcpUdpHeader, 0, pseudoHeader, 12, tcpUdpHeader.Length);
 
-
-                ushort tcpChecksum = CalculateChecksum(pseudoHeader);
+                ushort tcpChecksum = NetworkManager.CalculateChecksum(pseudoHeader);
                 tcpUdpHeader[16] = (byte)(tcpChecksum >> 8);
                 tcpUdpHeader[17] = (byte)(tcpChecksum & 0xFF);
 
@@ -95,7 +93,6 @@ namespace proj1 {
             byte[] packet = new byte[ipHeader.Length + tcpUdpHeader.Length];
             Array.Copy(ipHeader, 0, packet, 0, ipHeader.Length);
             Array.Copy(tcpUdpHeader, 0, packet, ipHeader.Length, tcpUdpHeader.Length);
-
 
             return packet;
         }
@@ -144,30 +141,5 @@ namespace proj1 {
             return tcpUdpHeader;
         }
 
-
-
-        private byte[] SetPortBytes(ushort port) {
-            byte[] portBytes = BitConverter.GetBytes(port);
-            if (BitConverter.IsLittleEndian)
-            {
-                Array.Reverse(portBytes);
-            }
-            return portBytes;
-        }
-
-        private static ushort CalculateChecksum(byte[] data)
-        {
-            uint sum = 0;
-            for (int i = 0; i < data.Length; i += 2)
-            {
-                ushort word = (ushort)((data[i] << 8) + (i + 1 < data.Length ? data[i + 1] : 0));
-                sum += word;
-                if ((sum & 0xFFFF0000) != 0)
-                {
-                    sum = (sum & 0xFFFF) + (sum >> 16);
-                }
-            }
-            return (ushort)~sum;
-        }
     }
 }

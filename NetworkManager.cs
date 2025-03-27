@@ -111,6 +111,32 @@ namespace proj1
                 Environment.Exit(1);
                 return null;
             }
+        }
+
+
+
+        public static byte[] SetPortBytes(ushort port) {
+            byte[] portBytes = BitConverter.GetBytes(port);
+            if (BitConverter.IsLittleEndian)
+            {
+                Array.Reverse(portBytes);
+            }
+            return portBytes;
+        }
+
+        public static ushort CalculateChecksum(byte[] data)
+        {
+            uint sum = 0;
+            for (int i = 0; i < data.Length; i += 2)
+            {
+                ushort word = (ushort)((data[i] << 8) + (i + 1 < data.Length ? data[i + 1] : 0));
+                sum += word;
+                if ((sum & 0xFFFF0000) != 0)
+                {
+                    sum = (sum & 0xFFFF) + (sum >> 16);
+                }
+            }
+            return (ushort)~sum;
         }    
 
 

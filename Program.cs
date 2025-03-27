@@ -10,12 +10,14 @@ namespace proj1
     {
         static void Main(string[] args)
         {
+            // parsing arguments
             ScanParams scanParams = null;
             Parser.Default.ParseArguments<ArgsOptions>(args)
             .WithParsed(options =>
             {
                 // if interface or target is not set
-                if (string.IsNullOrEmpty(options.Interface) || string.IsNullOrEmpty(options.Target)) {
+                if (string.IsNullOrEmpty(options.Interface) || string.IsNullOrEmpty(options.Target) || (string.IsNullOrEmpty(options.TcpPorts) && string.IsNullOrEmpty(options.UdpPorts))) {
+                    // print list of active interfaces
                     Console.WriteLine("Listing active interfaces...");
 
                     var interfaces = NetworkInterface.GetAllNetworkInterfaces();
@@ -25,9 +27,6 @@ namespace proj1
                     }
                     Environment.Exit(1);
                 }
-
-
-                
 
                 // create OOP representation of the command line arguments
                 scanParams = new ScanParams
@@ -44,23 +43,22 @@ namespace proj1
 
                 
             })
+            // arguments parsing error
             .WithNotParsed(errors =>
             {
-                Console.WriteLine("Error");   
+                Console.Error.WriteLine("Parsing args error");   
             });
 
-            Console.WriteLine(scanParams.ToString());
-            
-            
-            
+        
+            // scan tcp ports    
             scanParams.ScanTcpPorts();
-            
+            // scan udp ports
             scanParams.ScanUdpPorts();
             
             
 
         }
-
+        // function parsed port numbers to list of tcp and udp ports
         private static List<string> FillPortsList(string ports)
         {
             List<string> portsList = new List<string>();

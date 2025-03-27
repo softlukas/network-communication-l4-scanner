@@ -15,7 +15,7 @@ namespace proj1
         public string IpAddress { get; private set; }
 
         public ScanParams.IpVersion IpFormat { get; private set; }
-
+    
         public SingleIpAddress(string ipAddress, ScanParams.IpVersion ipFormat)
         {
             IpAddress = ipAddress;
@@ -51,17 +51,16 @@ namespace proj1
         }
 
         
-
-
         private List<SingleIpAddress> _targetIpsList = new List<SingleIpAddress>();
 
-        // if target ip is domain name, use DNS
+        
         public string Target
         {
             
             get => string.Join(",", _targetIpsList.Select(targetIp => targetIp.IpAddress));
             private set
             {
+                // set ipversion format
                 if (IPAddress.TryParse(value, out IPAddress ipAddress))
                 {
                     IpAddressFormat = NetworkManager.IsIpv6Address(value) ? IpVersion.IPv6 : IpVersion.IPv4;
@@ -74,6 +73,7 @@ namespace proj1
                 }
                 else
                 {
+                    // resolve ip from domain, if target is domain name
                     List<string> stringIpsList = NetworkManager.ResolveIpsFromDomain(value);
                     foreach (string ip in stringIpsList)
                     {
@@ -99,7 +99,7 @@ namespace proj1
 
         private static readonly object _lock = new object();
        
-
+        // set scan params atributes
         public ScanParams(string? networkInterface, List<string> udpPorts, List<string> tcpPorts, 
         string target, int timeout)
         {
@@ -132,20 +132,9 @@ namespace proj1
         public void ScanTcpPorts() {
             
             ScanTcpPortsIpv4();
-            
-            //Thread captureThread = new Thread(CaptureResponseTcp);
-            //captureThread.Start();
-
-            
             ScanTcpPortsIpv6();
-              
-            
-           
-            
         }
         private void ScanTcpPortsIpv6() {
-
-            
 
             var devices = CaptureDeviceList.Instance;
             var deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
@@ -157,9 +146,6 @@ namespace proj1
             }
 
             deviceInterface.Open();
-
-
-            
 
             foreach (string port in TcpPorts)
             {
@@ -173,19 +159,76 @@ namespace proj1
                 }
             }
 
-
             deviceInterface.Close();
 
-            
+        }
 
+        private void ScanTcpPortsIpv4() {
+
+            var devices = CaptureDeviceList.Instance;
+            var deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
+
+            if (deviceInterface == null)
+            {
+                Console.WriteLine($"Interface {NetworkInterface} not found.");
+                return;
+            }
+
+            deviceInterface.Open();
+
+            foreach (string port in TcpPorts)
+            {
+                foreach (SingleIpAddress targetIp in _targetIpsList)
+                {
+                    if(targetIp.IpFormat == IpVersion.IPv4)
+                    {
+                        SendSynPacketIpv4(deviceInterface, ushort.Parse(port), targetIp.IpAddress);
+                    }
+            
+                }
+            }
+
+            deviceInterface.Close();
+        }
+
+        public void ScanUdpPorts() {
+            
+            var devices = CaptureDeviceList.Instance;
+            var deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
+
+            if (deviceInterface == null)
+            {
+                Console.WriteLine($"Interface {NetworkInterface} not found.");
+                return;
+            }
+
+            deviceInterface.Open();
+
+            foreach (string port in UdpPorts)
+            {
+                foreach(SingleIpAddress targetIp in _targetIpsList)
+                {
+                    if(targetIp.IpFormat == IpVersion.IPv4)
+                    {
+                        SendUdpPacketIpv4(deviceInterface, ushort.Parse(port), targetIp.IpAddress);
+                    }
+                    if(targetIp.IpFormat == IpVersion.IPv6)
+                    {
+                        SendUdpPacketIpv6(deviceInterface, ushort.Parse(port), targetIp.IpAddress);
+                    }
+                }   
+            }
+
+            deviceInterface.Close();
+            
         }
 
         private void SendSynPacketIpv6(ICaptureDevice deviceInterface, ushort destinationPort, string targetIp, bool resending = false) 
         {
             // Set the destination port
-            byte[] destPortBytes = SetPortBytes(destinationPort);
+            byte[] destPortBytes = NetworkManager.SetPortBytes(destinationPort);
 
-            byte[] sourcePortBytes = SetPortBytes(sourcePort);
+            byte[] sourcePortBytes = NetworkManager.SetPortBytes(sourcePort);
 
             // Create TCP header
             byte[] tcpHeader = new byte[20];
@@ -233,7 +276,7 @@ namespace proj1
             Array.Copy(tcpHeader, 0, pseudoHeader, 36, tcpHeader.Length);
 
             // Calculate the checksum for the TCP header
-            ushort tcpChecksum = CalculateChecksum(pseudoHeader);
+            ushort tcpChecksum = NetworkManager.CalculateChecksum(pseudoHeader);
             tcpHeader[16] = (byte)(tcpChecksum >> 8);
             tcpHeader[17] = (byte)(tcpChecksum & 0xFF);
 
@@ -244,9 +287,6 @@ namespace proj1
 
             // Close the raw socket
             rawSocket.Close();
-            
-            
-            
             
             // set timeout
             DateTime startTime = DateTime.Now;
@@ -316,11 +356,6 @@ namespace proj1
                 }
             }
                 
-                
-                
-                
-
-
             // if no response between timeout, send SYN packet again
             if (resending == false)
             {
@@ -332,16 +367,12 @@ namespace proj1
                 // port is filtered
                 Console.WriteLine("{0} {1} {2} {3}", targetIp, destinationPort, Protocol.tcp, PortState.filtered);
             }
-                        
-
-                
-                
         }
 
         private void SendUdpPacketIpv6(ICaptureDevice deviceInterface, ushort destinationPort, string targetIp, bool resending = false) {
             // Set the destination port
-            byte[] destPortBytes = SetPortBytes(destinationPort);
-            byte[] sourcePortBytes = SetPortBytes(sourcePort);
+            byte[] destPortBytes = NetworkManager.SetPortBytes(destinationPort);
+            byte[] sourcePortBytes = NetworkManager.SetPortBytes(sourcePort);
 
             const ushort destUnreacheable = 1;
             const ushort portUnreachableCode = 4;
@@ -354,6 +385,7 @@ namespace proj1
             udpHeader[3] = destPortBytes[1];   // Destination port low byte
             udpHeader[4] = 0x00; // Length high byte (placeholder)
             udpHeader[5] = 0x08; // Length low byte (8 bytes UDP header)
+
             // Calculate UDP checksum
             byte[] pseudoHeader = new byte[40 + udpHeader.Length];
             Array.Copy(SourceIp, 0, pseudoHeader, 0, 16); // Source IP
@@ -364,7 +396,7 @@ namespace proj1
             pseudoHeader[35] = 0x08; // UDP length low byte
             Array.Copy(udpHeader, 0, pseudoHeader, 36, udpHeader.Length);
 
-            ushort udpChecksum = CalculateChecksum(pseudoHeader);
+            ushort udpChecksum = NetworkManager.CalculateChecksum(pseudoHeader);
             udpHeader[6] = (byte)(udpChecksum >> 8);
             udpHeader[7] = (byte)(udpChecksum & 0xFF);
             
@@ -374,8 +406,6 @@ namespace proj1
             rawSocket.Bind(new IPEndPoint(new IPAddress(SourceIp), 0));
             rawSocket.SendTo(udpHeader, new IPEndPoint(IPAddress.Parse(targetIp), 0));
             rawSocket.Close();
-
-            
 
             // Set timeout
             DateTime startTime = DateTime.Now;
@@ -408,79 +438,7 @@ namespace proj1
             // If no ICMP error response was received, assume the port is open
             Console.WriteLine("{0} {1} {2} {3}", targetIp, destinationPort, Protocol.udp, PortState.open);
         }
-        private void ScanTcpPortsIpv4() {
-
-            var devices = CaptureDeviceList.Instance;
-            var deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
-
-            if (deviceInterface == null)
-            {
-                Console.WriteLine($"Interface {NetworkInterface} not found.");
-                return;
-            }
-
-            deviceInterface.Open();
-
-            foreach (string port in TcpPorts)
-            {
-                foreach (SingleIpAddress targetIp in _targetIpsList)
-                {
-                    if(targetIp.IpFormat == IpVersion.IPv4)
-                    {
-                        //Thread thread = new Thread(() => SendSynPacketIpv4(ushort.Parse(port), targetIp.IpAddress));
-                        //thread.Start();
-                        
-                        SendSynPacketIpv4(deviceInterface, ushort.Parse(port), targetIp.IpAddress);
-                        
-                    }
-            
-                }
-            }
-
-            deviceInterface.Close();
-
-
-           
-
-        }
-
-        
-
-        
-        public void ScanUdpPorts() {
-            
-            var devices = CaptureDeviceList.Instance;
-            var deviceInterface = devices.FirstOrDefault(d => d.Name == NetworkInterface);
-
-            if (deviceInterface == null)
-            {
-                Console.WriteLine($"Interface {NetworkInterface} not found.");
-                return;
-            }
-
-            deviceInterface.Open();
-
-            foreach (string port in UdpPorts)
-            {
-                foreach(SingleIpAddress targetIp in _targetIpsList)
-                {
-                    if(targetIp.IpFormat == IpVersion.IPv4)
-                    {
-                        SendUdpPacketIpv4(deviceInterface, ushort.Parse(port), targetIp.IpAddress);
-                    }
-                    if(targetIp.IpFormat == IpVersion.IPv6)
-                    {
-                        SendUdpPacketIpv6(deviceInterface, ushort.Parse(port), targetIp.IpAddress);
-                    }
-                }   
-            }
-
-            deviceInterface.Close();
-            
-        }
-
-        
-
+                
         private void SendUdpPacketIpv4(ICaptureDevice deviceInterface, ushort destinationPort, string targetIp, bool resending = false)
         {
             const ushort destUnreacheable = 3;
@@ -611,7 +569,6 @@ namespace proj1
                 }
             }
             
-            
             // if no response between timeout, send SYN packet again
             if (resending == false)
             {
@@ -623,14 +580,10 @@ namespace proj1
                 // port is filtered
                 Console.WriteLine("{0} {1} {2} {3}", targetIp, destinationPort, Protocol.tcp, PortState.filtered);
             }
-
-
-
         }
 
         private bool MatchReplyPortIpAddress(byte[] packetData, ushort testedPort, Protocol protocol)
         {
-           
             
             // Extract the source and destination IP addresses
             byte[] sourceIp = new byte[4];
@@ -644,7 +597,6 @@ namespace proj1
                 
                 if (new IPAddress(destIp).ToString() == new IPAddress(SourceIp).ToString()) {
                     
-
                     // Extract the source and destination ports
                     ushort replySrcPort = 0;    
                     ushort replyDestPort = 0;   
@@ -659,11 +611,6 @@ namespace proj1
                         replyDestPort = (ushort)((packetData[62] << 8) + packetData[63]);
                     }
                     
-
-                    
-
-
-
                     // Check if the packet is a TCP packet
                     if (packetData[23] == 0x06) {
                         // Check if the ports match
@@ -672,8 +619,6 @@ namespace proj1
                             return true;
                         }
                     }
-                    // Check if the packet is a UDP packet
-                    //else if (packetData[23] == 0x11) {
                     
                     // Check if the ports match
                     if (replySrcPort == testedPort && replyDestPort == sourcePort)
@@ -743,9 +688,6 @@ namespace proj1
             {
                 
                 if (new IPAddress(destIp).ToString() == new IPAddress(SourceIp).ToString()) {
-                    /// Extract the source and destination ports from the original UDP header inside ICMPv6
-                    ///
-
                     
                     ushort replySrcPort = (ushort)((packetData[90] << 8) + packetData[91]); // Correct offset for IPv6
                     ushort replyDestPort = (ushort)((packetData[88] << 8) + packetData[89]); // Correct offset for IPv6
@@ -759,29 +701,7 @@ namespace proj1
             return false;
         }
 
-        private byte[] SetPortBytes(ushort port) {
-            byte[] portBytes = BitConverter.GetBytes(port);
-            if (BitConverter.IsLittleEndian)
-            {
-                Array.Reverse(portBytes);
-            }
-            return portBytes;
-        }
-
-        private static ushort CalculateChecksum(byte[] data)
-        {
-            uint sum = 0;
-            for (int i = 0; i < data.Length; i += 2)
-            {
-                ushort word = (ushort)((data[i] << 8) + (i + 1 < data.Length ? data[i + 1] : 0));
-                sum += word;
-                if ((sum & 0xFFFF0000) != 0)
-                {
-                    sum = (sum & 0xFFFF) + (sum >> 16);
-                }
-            }
-            return (ushort)~sum;
-        }
+        
 
     }
 }
