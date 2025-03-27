@@ -18,5 +18,8 @@ namespace proj1
 
         [Value(0, MetaName = "target", Required = false, HelpText = "Target domain name or IP address to scan.")]
         public string? Target { get; set; }
+
+        [Option('h', "help", Required = false, HelpText = "Displays this help message.")]
+        public bool Help { get; set; }
     }
 }

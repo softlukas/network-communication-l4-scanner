@@ -141,7 +141,7 @@ namespace proj1
 
             if (deviceInterface == null)
             {
-                Console.WriteLine($"Interface {NetworkInterface} not found.");
+                Console.Error.WriteLine($"Interface {NetworkInterface} not found.");
                 return;
             }
 
@@ -170,7 +170,7 @@ namespace proj1
 
             if (deviceInterface == null)
             {
-                Console.WriteLine($"Interface {NetworkInterface} not found.");
+                Console.Error.WriteLine($"Interface {NetworkInterface} not found.");
                 return;
             }
 
@@ -198,7 +198,7 @@ namespace proj1
 
             if (deviceInterface == null)
             {
-                Console.WriteLine($"Interface {NetworkInterface} not found.");
+                Console.Error.WriteLine($"Interface {NetworkInterface} not found.");
                 return;
             }
 
@@ -682,7 +682,6 @@ namespace proj1
             // For IPv6, the source IP starts at byte 8 and destination at byte 24
             Array.Copy(packetData, 8, sourceIp, 0, 16);
             Array.Copy(packetData, 24, destIp, 0, 16);
-            Console.WriteLine("Dostal som sa sem");
             // Check if the packet is from the target IP (IPv6)
             if (_targetIpsList.Any(ip => ip.IpAddress == new IPAddress(sourceIp).ToString())) 
             {

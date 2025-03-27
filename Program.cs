@@ -15,6 +15,21 @@ namespace proj1
             Parser.Default.ParseArguments<ArgsOptions>(args)
             .WithParsed(options =>
             {
+
+
+                 // check if help flag is set
+                if (options.Help)
+                {
+                    Console.WriteLine("Usage:");
+                    Console.WriteLine("  -i, --interface <name>    Specify network interface");
+                    Console.WriteLine("  -u, --pu <ports>         UDP ports to scan");
+                    Console.WriteLine("  -t, --pt <ports>         TCP ports to scan");
+                    Console.WriteLine("  -w, --wait <ms>         Timeout in milliseconds (default is 5000ms)");
+                    Console.WriteLine("  <target>                Target domain or IP address");
+                    Environment.Exit(0);
+                }
+                
+
                 // if interface or target is not set
                 if (string.IsNullOrEmpty(options.Interface) || string.IsNullOrEmpty(options.Target) || (string.IsNullOrEmpty(options.TcpPorts) && string.IsNullOrEmpty(options.UdpPorts))) {
                     // print list of active interfaces
@@ -46,7 +61,8 @@ namespace proj1
             // arguments parsing error
             .WithNotParsed(errors =>
             {
-                Console.Error.WriteLine("Parsing args error");   
+                Console.Error.WriteLine("Parsing args error");
+                Environment.Exit(1);   
             });
 
         
