@@ -1,5 +1,5 @@
-/bin
-/obj
+src/bin
+src/obj
 ipk-proj1.sln
 .vscode/
 TCPPacketSender.cs

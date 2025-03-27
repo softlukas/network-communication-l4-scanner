@@ -1,4 +1,4 @@
-PROJECT = proj1.csproj
+PROJECT = src/proj1.csproj
 
 all: clean publish
 
